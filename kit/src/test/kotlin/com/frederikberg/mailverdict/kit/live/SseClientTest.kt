@@ -323,6 +323,25 @@ class SseClientTest {
             assertTrue("$starts attempts in ${elapsed}ms", starts <= elapsed / timing.minAttemptIntervalMs + 3)
         }
 
+    /** A scene flapping between background and foreground inside one instant must not turn into a burst of connections. */
+    @Test
+    fun aFlappedLifecycleInOneInstantOpensAtMostOneStreamPerFloor() =
+        runTest {
+            val rig = rig()
+            rig.transport.otherwise { ScriptedTransport.Connection() }
+            rig.client.connect()
+            runCurrent()
+            repeat(200) {
+                rig.client.pause()
+                rig.client.resume()
+            }
+            advanceTimeBy(2_000)
+
+            assertEquals(1, rig.transport.live)
+            assertEquals(1, rig.transport.peak)
+            assertTrue("${rig.client.attemptsStarted} attempts for 200 flaps", rig.client.attemptsStarted <= 3)
+        }
+
     @Test
     fun aDisconnectedClientCannotBeRevived() =
         runTest {
