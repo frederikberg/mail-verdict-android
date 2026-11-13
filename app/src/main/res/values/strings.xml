@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MailVerdict</string>
+    <string name="shell_no_account">Not signed in</string>
+    <string name="shell_fixture_mode">Fixture data</string>
+</resources>

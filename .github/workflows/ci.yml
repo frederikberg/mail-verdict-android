@@ -1,0 +1,142 @@
+name: CI
+
+# Pull-request checks only: `main` runs nothing after a merge, because the ruleset requires `CI ok`
+# on a branch that is up to date with `main`, so the tree that lands is the tree that was tested.
+# A tag runs release.yml.
+on:
+  pull_request:
+    branches: [main]
+
+# Hosted runners only: this repository is public, and a pull_request run executes the workflow
+# file as it stands on the PR's own head.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  detect:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      build: ${{ steps.filter.outputs.build }}
+      scripts: ${{ steps.filter.outputs.scripts }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            build:
+              - 'contract/**'
+              - 'kit/**'
+              - 'app/**'
+              - 'gradle/**'
+              - 'build.gradle.kts'
+              - 'settings.gradle.kts'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'gradlew.bat'
+              - '.editorconfig'
+              - '.github/workflows/ci.yml'
+            scripts:
+              - 'tooling/**'
+              - 'CHANGELOG.md'
+              - 'gradle.properties'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/release.yml'
+
+  build:
+    name: Build and test
+    needs: detect
+    if: needs.detect.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Installs the SDK command-line tools and accepts the licences; Gradle fetches the platform
+      # and build-tools it needs on first use.
+      - uses: android-actions/setup-android@v4
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # The record task runs every unit test of :app and writes the screenshots; a separate
+      # testDebugUnitTest would run them twice.
+      - name: Lint, test, build
+        run: >
+          ./gradlew --console=plain
+          ktlintCheck
+          :contract:test
+          :kit:test
+          :app:recordRoborazziDebug
+          :app:lintDebug
+          :app:assembleDebug
+
+      # Recorded, never verified: a pixel comparison across renderer and JDK versions fails without
+      # a regression behind it. The pictures are for a reviewer to look at.
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: screenshots
+          path: app/build/outputs/roborazzi
+          if-no-files-found: ignore
+          retention-days: 5
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: reports
+          path: |
+            **/build/reports
+            **/build/test-results
+          retention-days: 5
+
+  release-scripts:
+    name: Release scripts
+    needs: detect
+    if: needs.detect.outputs.scripts == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: ShellCheck
+        run: shellcheck tooling/*.sh
+
+      # Runs the scripts against good and deliberately broken repositories.
+      - name: Self-test
+        run: tooling/test-release-scripts.sh
+
+      - name: Versions agree
+        run: tooling/check_release_versions.sh
+
+  # The single required check. Skipped jobs (nothing they cover changed) count as passing.
+  ci-ok:
+    name: CI ok
+    needs: [detect, build, release-scripts]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: All required jobs passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "*|*" cancelled "*) exit 1 ;;
+          esac
