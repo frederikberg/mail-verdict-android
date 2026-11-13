@@ -92,7 +92,16 @@ private suspend fun <T> abortOnCancel(
     block: () -> T,
 ): T =
     coroutineScope {
-        val work = async(Dispatchers.IO) { block() }
+        val work =
+            async(Dispatchers.IO) {
+                try {
+                    block()
+                } catch (e: IOException) {
+                    // The abort below surfaces as a socket error; it is the cancellation, not a failure of the stream.
+                    if (call.isCanceled()) throw CancellationException("The read was aborted", e)
+                    throw e
+                }
+            }
         try {
             work.await()
         } catch (e: CancellationException) {
