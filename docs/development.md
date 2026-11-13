@@ -21,6 +21,27 @@ The split keeps logic where a plain JUnit test reaches it in seconds. A view is 
 bug in it could be caught by a unit test; the two things that need Android itself (token storage,
 the browser leg of sign-in) are interfaces in `:kit` with the real implementation in `:app`.
 
+## Authentication and live updates
+
+The server sits behind a login proxy, so a refused request means one of three things, and
+`ApiError` tells them apart: a `401` or a bare non-JSON `403` (the proxy rejecting the token) is a
+rejected credential; a `403` with a JSON `detail` is the app refusing that one request and leaves the
+person signed in; the `detail` `user_disabled` ends the session.
+
+- A signed-in session is an `AuthMode.Oidc` token set. Access tokens live very long, so nothing is
+  renewed ahead of time except a token whose provider stated a lifetime; the normal trigger is a
+  refusal. `TokenRefresher` renews single-flight (the provider rotates refresh tokens, so two
+  simultaneous renewals would leave one caller holding a retired token) and stores the new set
+  before using it. A rejected refresh token ends the session; an unreachable provider does not.
+- `ApiClient` renews and resends a refused request once. `SseClient` does the same for the event
+  stream, reconnecting with the last event id so the server replays what was missed (or answers
+  `resync`), backing off with jitter, and treating a stream silent for three ping intervals as dead.
+- `LiveEventHub` turns each event into a `LiveInvalidation` (the table lives in
+  `LiveInvalidation.from`), holding mail bursts for 500 ms so a store refreshes once.
+- Two things need Android and are interfaces in `:kit`: `TokenStore` (where the credential
+  survives a restart) and `Connectivity` (the device's network path). A pasted bearer token is
+  `AuthMode.Bearer` and is never renewed.
+
 ## Checks
 
 ```bash
