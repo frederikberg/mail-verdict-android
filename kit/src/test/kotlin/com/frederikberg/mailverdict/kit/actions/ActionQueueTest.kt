@@ -629,6 +629,8 @@ class ActionQueueTest {
         flow: kotlinx.coroutines.flow.Flow<T>,
         block: (T) -> Unit,
     ) {
-        kotlinx.coroutines.CoroutineScope(coroutineContext).let { s -> s.launch { flow.collect { block(it) } } }
+        kotlinx.coroutines.CoroutineScope(coroutineContext).let { s ->
+            s.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { flow.collect { block(it) } }
+        }
     }
 }
