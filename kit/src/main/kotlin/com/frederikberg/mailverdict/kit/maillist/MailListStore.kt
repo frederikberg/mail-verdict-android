@@ -1,6 +1,14 @@
 package com.frederikberg.mailverdict.kit.maillist
 
 import com.frederikberg.mailverdict.contract.MessageSummary
+import com.frederikberg.mailverdict.kit.actions.ActionContext
+import com.frederikberg.mailverdict.kit.actions.ActionQueue
+import com.frederikberg.mailverdict.kit.actions.IntentObserver
+import com.frederikberg.mailverdict.kit.actions.IntentProjection
+import com.frederikberg.mailverdict.kit.actions.MailIntent
+import com.frederikberg.mailverdict.kit.actions.ProjectionScope
+import com.frederikberg.mailverdict.kit.actions.TriageRequests
+import com.frederikberg.mailverdict.kit.actions.UiAction
 import com.frederikberg.mailverdict.kit.cache.NoOfflineCache
 import com.frederikberg.mailverdict.kit.cache.OfflineCache
 import com.frederikberg.mailverdict.kit.cache.OfflineListKey
@@ -47,6 +55,8 @@ class MailListStore(
     private val rowFactory: MailRowFactory = MailRowFactory(),
     private val nowMs: () -> Long = System::currentTimeMillis,
     private val aroundMessageId: String? = null,
+    /** Every action goes through it; the rows shown are the server's rows with its outstanding intents applied. */
+    private val actions: ActionQueue? = null,
 ) {
     private val lock = Any()
     private var base: List<MessageSummary> = emptyList()
@@ -74,8 +84,11 @@ class MailListStore(
     /** Rows read while the unread filter is on keep showing until the filter or the list changes. */
     private var keptWhileUnread: Set<String> = emptySet()
 
-    /** Rows opened in the reader: shown as read at once, whatever the next read says until it agrees. */
-    private var openedIds: Set<String> = emptySet()
+    /** The queue's sequence when the oldest part of [base] was read ([IntentProjection.applies]). */
+    private var baseSequence = 0
+
+    /** [base] with the queue's intents applied: what the person sees, and what an action is built from. */
+    private var projectedBase: List<MessageSummary> = emptyList()
 
     private var generation = 0
     private var started = false
@@ -85,16 +98,45 @@ class MailListStore(
     private var lastRefreshFailure: Throwable? = null
     private val pageLock = Mutex()
 
-    /** Rows turn into what [MailListState.rows] holds through this; optimistic actions apply here. */
-    @Volatile
-    var projection: (List<MessageSummary>) -> List<MessageSummary> = { it }
-
     @Volatile
     var savedViewport: ViewportAnchor? = null
         private set
 
     private val _state = MutableStateFlow(snapshot())
     val state: StateFlow<MailListState> = _state.asStateFlow()
+
+    private val intentObserver =
+        object : IntentObserver {
+            override fun intentSnapshots(messageIds: Set<String>): List<MessageSummary> =
+                synchronized(lock) { base.filter { it.id in messageIds } }
+
+            /** Data read before these settled keeps their effect once they are gone from the queue. */
+            override fun intentsWillRetire(intents: List<MailIntent>) {
+                synchronized(lock) {
+                    base = IntentProjection.rows(base, intents, baseSequence, projectionScope())
+                    rebuildRows()
+                }
+                publish()
+            }
+
+            /** Whatever the server derives from a change (counts, conversation rows) is read again once it has the change. */
+            override fun intentsDidSettle(intents: List<MailIntent>) {
+                val accounts = synchronized(lock) { accountIdsInScope() }
+                if (intents.any { it.accountId in accounts }) requestRefresh()
+            }
+        }
+
+    init {
+        actions?.let { queue ->
+            queue.addObserver(intentObserver)
+            coroutineScope.launch {
+                queue.state.collect {
+                    synchronized(lock) { rebuildRows() }
+                    publish()
+                }
+            }
+        }
+    }
 
     // Loading
 
@@ -116,7 +158,6 @@ class MailListStore(
             synchronized(lock) {
                 generation += 1
                 keptWhileUnread = emptySet()
-                openedIds = emptySet()
                 selected = emptySet()
                 selecting = false
                 pendingArrivals = 0
@@ -136,6 +177,7 @@ class MailListStore(
         val (threaded, unreadOnly) = synchronized(lock) { this.threaded to this.unreadOnly }
         synchronized(lock) { if (rows.isEmpty()) phase = ListPhase.Loading }
         publish()
+        val readAt = queueSequence()
         try {
             var landedAround = false
             val page =
@@ -156,6 +198,7 @@ class MailListStore(
                 synchronized(lock) {
                     if (generation != expected) return@synchronized false
                     base = page.messages
+                    baseSequence = readAt
                     hasOlder = page.hasMore
                     hasNewer = page.hasMoreNewer
                     install(ListIdentity(scope, threaded, unreadOnly, expected))
@@ -216,6 +259,8 @@ class MailListStore(
         synchronized(lock) {
             if (generation != expected) return false
             base = saved.rows
+            // Read at an unknown time: every intent not yet retired applies over it.
+            baseSequence = 0
             hasOlder = saved.hasOlder
             hasNewer = false
             install(ListIdentity(scope, threaded, unreadOnly, expected))
@@ -272,10 +317,12 @@ class MailListStore(
                     synchronized(lock) {
                         if (older) ListCursor.OlderThan(base.last().id) else ListCursor.NewerThan(base.first().id)
                     }
+                val readAt = queueSequence()
                 val response = backend.page(scope, window.threaded, window.unreadOnly, cursor, MailListWindow.PAGE_SIZE)
                 var reachedNewestEdge = false
                 synchronized(lock) {
                     if (identity != window) return@synchronized
+                    baseSequence = minOf(baseSequence, readAt)
                     if (older) {
                         base = MailListWindow.appendingOlder(response.messages, base)
                         hasOlder = response.hasMore
@@ -311,6 +358,7 @@ class MailListStore(
                 pendingArrivals = 0
                 base.firstOrNull()?.id
             } ?: return
+        val readAt = queueSequence()
         val response =
             runCatching {
                 backend.page(
@@ -323,6 +371,7 @@ class MailListStore(
             }.getOrNull() ?: return
         synchronized(lock) {
             if (identity != started) return
+            baseSequence = minOf(baseSequence, readAt)
             base = MailListWindow.prependingNewer(response.messages, base)
             rebuildRows()
         }
@@ -365,17 +414,15 @@ class MailListStore(
 
     private suspend fun refreshOnce() {
         synchronized(lock) { lastRefreshFailure = null }
+        val readAt = queueSequence()
         val snapshot =
             synchronized(lock) {
                 if (phase != ListPhase.Loaded || base.isEmpty()) return
-                RefreshInput(
-                    identity,
-                    base,
-                    hasNewer,
-                    hasOlder,
-                    savedCopyAtMs != null,
-                    if (identity.unreadOnly) keptWhileUnread else emptySet(),
-                )
+                val preserve = if (identity.unreadOnly) keptWhileUnread else emptySet()
+                // A row kept while the unread filter is on stays as the reader last saw it, read, even once the change that made it so has left the queue.
+                val shown = projectedBase.associateBy { it.id }
+                val current = base.map { if (it.id in preserve) shown[it.id] ?: it else it }
+                RefreshInput(identity, current, hasNewer, hasOlder, savedCopyAtMs != null, preserve)
             }
         val limit = MailListWindow.refreshLimit(snapshot.current.size)
         try {
@@ -399,6 +446,7 @@ class MailListStore(
                 synchronized(lock) {
                     if (identity != snapshot.identity) return
                     base = merged.rows
+                    baseSequence = readAt
                     hasNewer = merged.hasNewer
                     savedCopyAtMs = null
                     rebuildRows()
@@ -433,6 +481,7 @@ class MailListStore(
                 synchronized(lock) {
                     if (identity != snapshot.identity) return
                     base = merged.rows
+                    baseSequence = readAt
                     hasOlder = merged.hasMore
                     savedCopyAtMs = null
                     rebuildRows()
@@ -551,7 +600,7 @@ class MailListStore(
         pathRestored: Flow<Unit>,
         connected: Flow<Boolean>? = null,
     ) {
-        coroutineScope.launch { events.collect { batch -> apply(batch.map { it.invalidation }) } }
+        coroutineScope.launch { events.collect { batch -> applyEvents(batch) } }
         coroutineScope.launch { pathRestored.collect { networkPathRestored() } }
         connected?.let { coroutineScope.launch { it.collect(::setConnected) } }
     }
@@ -576,12 +625,18 @@ class MailListStore(
     }
 
     fun apply(invalidations: List<LiveInvalidation>) {
+        val now = nowMs()
+        applyEvents(invalidations.map { LiveEvent(it, now) })
+    }
+
+    fun applyEvents(events: List<LiveEvent>) {
         var needsRefresh = false
         var needsContext = false
         var needsCounts = false
         var arrivals = 0
         synchronized(lock) {
-            for (event in invalidations) {
+            for (live in events) {
+                val event = live.invalidation
                 when (event) {
                     is LiveInvalidation.Resync -> {
                         needsRefresh = true
@@ -598,7 +653,11 @@ class MailListStore(
                             concerns(event.folderId) ||
                                 event.oldFolderId?.let(::concerns) == true ||
                                 (event.messageId?.let { id -> base.any { it.id == id } } ?: false)
-                        if (concerned) needsRefresh = true
+                        if (concerned &&
+                            !isSettledEcho(event.messageId, event.accountId, live.arrivedAtMs)
+                        ) {
+                            needsRefresh = true
+                        }
                         if (LiveInvalidation.messageUpdateMovesCounts(event.changed) &&
                             (event.changed.contains("folder_id") || concerns(event.folderId))
                         ) {
@@ -608,7 +667,10 @@ class MailListStore(
                     is LiveInvalidation.MailDeleted -> {
                         if (concerns(event.folderId)) needsCounts = true
                         val id = event.messageId
-                        if (id != null && base.any { it.id == id }) {
+                        if (id != null &&
+                            base.any { it.id == id } &&
+                            !isSettledEcho(id, event.accountId, live.arrivedAtMs)
+                        ) {
                             base = base.filterNot { it.id == id }
                             rebuildRows()
                             needsRefresh = true
@@ -667,14 +729,9 @@ class MailListStore(
     /** The "new mail" capsule in a window that does not start at the newest message: replaced with a fresh newest page rather than paged all the way up. */
     suspend fun jumpToLatest() = replaceList()
 
-    /** A row was opened in the reader: shown read at once, and kept while the unread filter is on. */
+    /** A row was opened in the reader: kept while the unread filter is on, so it does not vanish under the person who is reading it. */
     fun didOpen(rowId: String) {
-        synchronized(lock) {
-            if (unreadOnly) keptWhileUnread = keptWhileUnread + rowId
-            openedIds = openedIds + rowId
-            rebuildRows()
-        }
-        publish()
+        synchronized(lock) { if (unreadOnly) keptWhileUnread = keptWhileUnread + rowId }
     }
 
     /** Remembered across a visit to the reader; null forgets it (a new list starts at the top). */
@@ -731,23 +788,75 @@ class MailListStore(
             context.folderRoles[m.folderId]?.let { it in RECIPIENT_ROLES } ==
                 true
         }
-        // A row the reader opened shows read until a read of the server agrees; a row the server now says is read drops its override.
-        val seen = base.filter { it.id in openedIds && it.isSeen }.mapTo(HashSet()) { it.id }
-        if (seen.isNotEmpty()) openedIds = openedIds - seen
-        val projected = projection(base)
-        rows =
-            projected.map {
-                rowFactory.make(
-                    if (it.id in
-                        openedIds
-                    ) {
-                        it.copy(isSeen = true)
-                    } else {
-                        it
-                    },
-                    showRecipients(it),
-                )
-            }
+        projectedBase =
+            actions?.let { IntentProjection.rows(base, it.state.value.intents, baseSequence, projectionScope()) }
+                ?: base
+        rows = projectedBase.map { rowFactory.make(it, showRecipients(it)) }
+    }
+
+    /** What an intent needs to know about this list to apply itself to its rows. Must be called with [lock] held. */
+    private fun projectionScope() =
+        ProjectionScope(
+            folderIds =
+                when (scope) {
+                    is ListScope.Folder -> setOf(scope.folderId)
+                    is ListScope.Unified -> context.memberFolderIds
+                },
+            threaded = identity.threaded,
+            hasOlder = hasOlder,
+            hasNewer = hasNewer,
+        )
+
+    private fun queueSequence(): Int = actions?.state?.value?.sequence ?: 0
+
+    private fun isSettledEcho(
+        messageId: String?,
+        accountId: String?,
+        arrivedAtMs: Long,
+    ): Boolean {
+        val queue = actions ?: return false
+        if (messageId == null) return false
+        val accounts = accountId?.let { setOf(it) } ?: accountIdsInScope()
+        return accounts.any { queue.isSettledEcho(messageId, it, arrivedAtMs) }
+    }
+
+    // Actions
+
+    /** The rows of [ids] as the person sees them, with the queue's intents applied. */
+    fun rowsFor(ids: Set<String>): List<MessageSummary> = synchronized(lock) { projectedBase.filter { it.id in ids } }
+
+    /** What the menus offer for [ids]: read and star state, and whether they sit in Trash or Junk. */
+    fun actionContext(ids: Set<String>): ActionContext {
+        val rows = rowsFor(ids)
+        val roles = synchronized(lock) { context.folderRoles }
+        return ActionContext(
+            isRead = rows.isNotEmpty() && rows.all { it.isSeen },
+            isStarred = rows.isNotEmpty() && rows.all { it.isFlagged },
+            isInTrash = rows.isNotEmpty() && rows.all { roles[it.folderId] == "trash" },
+            isInJunk = rows.isNotEmpty() && rows.all { roles[it.folderId] == "junk" },
+            isInGlacier = rows.isNotEmpty() && rows.all { it.isGlacier },
+        )
+    }
+
+    /** The folders [ids] are in: where a move does nothing. */
+    fun foldersOf(ids: Set<String>): Set<String> = rowsFor(ids).mapTo(HashSet()) { it.folderId }
+
+    /** The accounts [ids] belong to. */
+    fun accountsOf(ids: Set<String>): Set<String> = rowsFor(ids).mapTo(HashSet()) { it.accountId }
+
+    /** Hands [action] on [ids] to the queue, with an Undo offer where the action can be undone, and ends selection. [targetFolderId] names where a move goes. */
+    fun perform(
+        action: UiAction,
+        ids: Set<String>,
+        targetFolderId: String? = null,
+    ) {
+        val queue = actions ?: return
+        val rows = rowsFor(ids)
+        val requests = TriageRequests.forRows(rows, action, identity.threaded, targetFolderId)
+        if (requests.isEmpty()) return
+        val queued = requests.map { queue.enqueue(it) }
+        action.action?.let { kind -> TriageRequests.undoNotice(kind, rows.size)?.let { queue.offerUndo(it, queued) } }
+        stopSelecting()
     }
 
     private fun snapshot(): MailListState =
