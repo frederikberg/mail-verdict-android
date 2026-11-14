@@ -75,12 +75,30 @@ class ActionQueueTest {
         runTest {
             val queue = queue()
             var failures = 1
-            transport.onMessage = { if (it.action == "mark_read" && failures-- > 0) throw ApiError.Http(500, "Internal Server Error") else transport.ok(it) }
+            transport.onMessage =
+                {
+                    if (it.action == "mark_read" &&
+                        failures-- > 0
+                    ) {
+                        throw ApiError.Http(500, "Internal Server Error")
+                    } else {
+                        transport.ok(it)
+                    }
+                }
             queue.enqueue(request(TriageAction.MarkRead, "m1"))
             queue.enqueue(request(TriageAction.Archive, "m1"))
             queue.enqueue(request(TriageAction.Flag, "m2"))
             advanceTimeBy(500)
-            assertEquals("the other message goes ahead, the archive waits for its read", listOf("mark_read", "flag"), transport.sent.map { it.action })
+            assertEquals(
+                "the other message goes ahead, the archive waits for its read",
+                listOf(
+                    "mark_read",
+                    "flag",
+                ),
+                transport.sent.map {
+                    it.action
+                },
+            )
             advanceTimeBy(5_000)
             assertEquals(listOf("mark_read", "flag", "mark_read", "archive"), transport.sent.map { it.action })
         }
@@ -481,7 +499,11 @@ class ActionQueueTest {
             queue.undo(listOf(id))
             runCurrent()
             assertEquals("nothing to reverse", 1, transport.sent.size)
-            assertTrue("and no reversal is even queued", queue.state.value.intents.none { it.undoes != null })
+            assertTrue(
+                "and no reversal is even queued",
+                queue.state.value.intents
+                    .none { it.undoes != null },
+            )
             assertNull(TriageRequests.undoNotice(TriageAction.Expunge, 1))
         }
 
