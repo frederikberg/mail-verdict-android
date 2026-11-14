@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="push_channel_mail">New mail</string>
+    <string name="push_channel_system">System</string>
+    <string name="push_no_keys">The notification helper app did not provide encryption keys.</string>
+    <string name="push_failed_network">The notification helper app could not connect. Try again when the network is back.</string>
+    <string name="push_failed_action_required">The notification helper app needs your attention. Open it and finish its setup.</string>
+    <string name="push_failed_vapid">The notification helper app needs a newer MailVerdict server key than this one offered.</string>
+    <string name="push_failed_internal">The notification helper app reported an error. Try again.</string>
+
+    <string name="push_title">Notifications</string>
+    <string name="push_intro">MailVerdict sends new mail to your phone through a small helper app you install once, the same way many open-source apps do. It does not use Google services. The helper keeps one connection open and wakes this app when mail arrives.</string>
+    <string name="push_status_loading">Checking…</string>
+    <string name="push_status_load_failed">Could not check notifications: %1$s</string>
+    <string name="push_status_server_unavailable">This server cannot send notifications: it has no encryption key configured.</string>
+    <string name="push_status_no_distributor">No helper app is installed yet.</string>
+    <string name="push_status_off">Notifications are off.</string>
+    <string name="push_status_registering">Setting up…</string>
+    <string name="push_status_registered">Notifications are on for this phone.</string>
+    <string name="push_status_failed">Setting up failed: %1$s</string>
+    <string name="push_get_distributor">Get a helper app</string>
+    <string name="push_get_distributor_hint">Install one of the apps listed on unifiedpush.org, such as ntfy or Sunup, open it once, then come back here.</string>
+    <string name="push_choose_distributor">Use a different helper app</string>
+    <string name="push_enable">Turn on notifications</string>
+    <string name="push_disable">Turn off notifications</string>
+    <string name="push_send_test">Send a test notification</string>
+    <string name="push_allow_system">Allow notifications</string>
+    <string name="push_allow_system_hint">Android is not letting this app show notifications yet.</string>
+    <string name="push_channels_title">What to be notified about</string>
+    <string name="push_channel_mail_summary">Every new message that stays in a folder you watch</string>
+    <string name="push_channel_system_summary">Mail that could not be sent and other things the server needs you to know</string>
+    <string name="push_device_label">This phone: %1$s</string>
+</resources>

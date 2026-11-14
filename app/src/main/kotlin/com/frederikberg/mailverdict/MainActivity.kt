@@ -1,6 +1,7 @@
 package com.frederikberg.mailverdict
 
 import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -13,6 +14,7 @@ import androidx.compose.runtime.getValue
 import com.frederikberg.mailverdict.kit.session.SessionState
 import com.frederikberg.mailverdict.nav.AppNavigation
 import com.frederikberg.mailverdict.platform.ThemeChoice
+import com.frederikberg.mailverdict.push.PushNotifier
 import com.frederikberg.mailverdict.signin.SignInRoute
 import com.frederikberg.mailverdict.ui.theme.MailVerdictTheme
 import kotlinx.coroutines.launch
@@ -24,6 +26,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         graph = (application as MailVerdictApp).graphFor(FixtureMode.requested(intent))
+        graph.deepLinks.offer(PushNotifier.targetOf(intent))
         setContent {
             val theme by graph.preferences.theme.collectAsState()
             val sessionState by graph.session.state.collectAsState()
@@ -54,6 +57,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        graph.deepLinks.offer(PushNotifier.targetOf(intent))
     }
 
     /** The stream runs only while the app is on screen; coming back reconnects at once and replays what was missed. */

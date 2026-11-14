@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="alerts_title">Alerts</string>
+    <string name="alerts_tab_mail">Mail (%1$d)</string>
+    <string name="alerts_tab_system">System (%1$d)</string>
+    <string name="alerts_dismiss">Dismiss</string>
+    <string name="alerts_dismiss_all">Dismiss all</string>
+    <string name="alerts_empty_mail">No new mail alerts.</string>
+    <string name="alerts_empty_system">Nothing needs your attention.</string>
+    <string name="alerts_error">Could not load alerts: %1$s</string>
+    <string name="alerts_push_banner">Notifications are off on this phone.</string>
+    <string name="alerts_push_banner_action">Set up</string>
+</resources>

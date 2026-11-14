@@ -1,6 +1,7 @@
 package com.frederikberg.mailverdict
 
 import android.content.Context
+import android.os.Build
 import com.frederikberg.mailverdict.contract.ContractJson
 import com.frederikberg.mailverdict.kit.auth.AuthMode
 import com.frederikberg.mailverdict.kit.auth.InMemoryTokenStore
@@ -8,17 +9,26 @@ import com.frederikberg.mailverdict.kit.auth.SealedFileTokenStore
 import com.frederikberg.mailverdict.kit.cache.FileOfflineCache
 import com.frederikberg.mailverdict.kit.fixtures.FixtureInterceptor
 import com.frederikberg.mailverdict.kit.fixtures.Fixtures
+import com.frederikberg.mailverdict.kit.push.PushController
+import com.frederikberg.mailverdict.kit.push.PushRegistrar
+import com.frederikberg.mailverdict.kit.push.PushSession
 import com.frederikberg.mailverdict.kit.session.ConnectionStores
 import com.frederikberg.mailverdict.kit.session.InMemoryServerAddressStore
 import com.frederikberg.mailverdict.kit.session.SessionController
+import com.frederikberg.mailverdict.kit.session.SessionState
 import com.frederikberg.mailverdict.maillist.AndroidMailListPreferences
 import com.frederikberg.mailverdict.platform.AlwaysOnline
 import com.frederikberg.mailverdict.platform.AndroidConnectivity
 import com.frederikberg.mailverdict.platform.AndroidKeystoreKey
 import com.frederikberg.mailverdict.platform.AppPreferences
+import com.frederikberg.mailverdict.push.DeepLinks
+import com.frederikberg.mailverdict.push.NoPushPlatform
+import com.frederikberg.mailverdict.push.PushRecordPreferences
+import com.frederikberg.mailverdict.push.UnifiedPushPlatform
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import timber.log.Timber
@@ -42,6 +52,10 @@ class AppGraph private constructor(
     val mailPreferences: AndroidMailListPreferences,
     /** Everything mail kept on the device lives under here and is removed on sign-out. */
     val mailCacheRoot: File,
+    /** Notifications through the phone's UnifiedPush distributor. */
+    val push: PushController,
+    /** A destination a notification tap asked for, until a screen has shown it. */
+    val deepLinks: DeepLinks,
 ) {
     companion object {
         /** The fixture session's server; nothing listens there, the interceptor answers first. */
@@ -81,6 +95,7 @@ class AppGraph private constructor(
             val mailCacheRoot = File(context.cacheDir, "mail")
             val connectionStores =
                 ConnectionStores(scope, session.state) { if (!fixtureMode) FileOfflineCache(mailCacheRoot).clear() }
+            val push = createPush(context, fixtureMode, session, scope)
             Timber.i("app graph created, fixtureMode=%s", fixtureMode)
             return AppGraph(
                 fixtureMode,
@@ -92,7 +107,49 @@ class AppGraph private constructor(
                 connectionStores,
                 AndroidMailListPreferences(context, fixtureMode),
                 mailCacheRoot,
+                push,
+                DeepLinks(),
             )
+        }
+
+        private fun createPush(
+            context: Context,
+            fixtureMode: Boolean,
+            session: SessionController,
+            scope: CoroutineScope,
+        ): PushController {
+            val push =
+                PushController(
+                    registrar = PushRegistrar(PushRecordPreferences(context, fixtureMode)),
+                    platform = if (fixtureMode) NoPushPlatform else UnifiedPushPlatform(context),
+                    session = {
+                        (session.state.value as? SessionState.SignedIn)?.connection?.let {
+                            PushSession(
+                                it.api,
+                                it.serverUrl,
+                            )
+                        }
+                    },
+                    deviceLabel = "Android · ${Build.MODEL}",
+                )
+            if (!fixtureMode) {
+                scope.launch {
+                    var wasSignedIn = false
+                    session.state.collect { state ->
+                        when (state) {
+                            is SessionState.SignedIn -> {
+                                wasSignedIn = true
+                                push.refresh()
+                            }
+                            is SessionState.SignedOut -> {
+                                if (wasSignedIn) push.onSignedOut()
+                                wasSignedIn = false
+                            }
+                        }
+                    }
+                }
+            }
+            return push
         }
     }
 }

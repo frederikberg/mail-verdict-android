@@ -28,6 +28,9 @@ fun MailboxesRoute(
     onOpenFolder: (MailboxesFolderRow) -> Unit,
     onOpenUnified: (MailboxesUnifiedRow) -> Unit,
     onOpenSettings: () -> Unit,
+    alertBadge: Int = 0,
+    onOpenSearch: () -> Unit = {},
+    onOpenAlerts: () -> Unit = {},
 ) {
     val store =
         remember(connection) {
@@ -61,5 +64,8 @@ fun MailboxesRoute(
         onOpenFolder = onOpenFolder,
         onOpenUnified = onOpenUnified,
         onOpenSettings = onOpenSettings,
+        alertBadge = alertBadge,
+        onOpenSearch = onOpenSearch,
+        onOpenAlerts = onOpenAlerts,
     )
 }
