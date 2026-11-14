@@ -5,6 +5,7 @@ import android.os.Build
 import com.frederikberg.mailverdict.contract.ContractJson
 import com.frederikberg.mailverdict.kit.auth.AuthMode
 import com.frederikberg.mailverdict.kit.auth.InMemoryTokenStore
+import com.frederikberg.mailverdict.kit.auth.OidcTokens
 import com.frederikberg.mailverdict.kit.auth.SealedFileTokenStore
 import com.frederikberg.mailverdict.kit.cache.FileOfflineCache
 import com.frederikberg.mailverdict.kit.fixtures.FixtureInterceptor
@@ -21,6 +22,7 @@ import com.frederikberg.mailverdict.platform.AlwaysOnline
 import com.frederikberg.mailverdict.platform.AndroidConnectivity
 import com.frederikberg.mailverdict.platform.AndroidKeystoreKey
 import com.frederikberg.mailverdict.platform.AppPreferences
+import com.frederikberg.mailverdict.platform.DeviceNames
 import com.frederikberg.mailverdict.push.DeepLinks
 import com.frederikberg.mailverdict.push.NoPushPlatform
 import com.frederikberg.mailverdict.push.PushRecordPreferences
@@ -63,6 +65,8 @@ class AppGraph private constructor(
         /** The fixture session's server; nothing listens there, the interceptor answers first. */
         private const val FIXTURE_SERVER = "https://fixture.invalid"
 
+        private val FIXTURE_TOKENS = OidcTokens(accessToken = "fixture", issuer = FIXTURE_SERVER, clientId = "fixture")
+
         fun create(
             context: Context,
             fixtureMode: Boolean,
@@ -73,16 +77,19 @@ class AppGraph private constructor(
                     .apply { if (fixtureMode) addInterceptor(FixtureInterceptor(Fixtures.routes)) }
                     .build()
             val preferences = AppPreferences(context, fixtureMode)
+            val deviceName = DeviceNames.of(context)
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             val session =
                 if (fixtureMode) {
                     SessionController(
                         scope,
                         client,
-                        InMemoryTokenStore(AuthMode.Bearer("fixture")),
+                        InMemoryTokenStore(AuthMode.Oidc(FIXTURE_TOKENS)),
                         InMemoryServerAddressStore(FIXTURE_SERVER),
                         AlwaysOnline,
+                        deviceName,
                         liveUpdates = false,
+                        revokesAtProvider = false,
                     )
                 } else {
                     SessionController(
@@ -91,6 +98,7 @@ class AppGraph private constructor(
                         SealedFileTokenStore(File(context.filesDir, "auth.bin"), AndroidKeystoreKey::get),
                         preferences,
                         AndroidConnectivity(context),
+                        deviceName,
                     )
                 }
             session.restore()

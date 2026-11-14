@@ -32,7 +32,15 @@ class AlertsStoreTest {
     }
 
     private fun store(subscription: String? = null) =
-        AlertsStore(ApiClient(RequestFactory(server.baseUrl) { AuthMode.None }, OkHttpClient()), scope) { subscription }
+        AlertsStore(
+            ApiClient(
+                RequestFactory(server.baseUrl, "Test phone") {
+                    AuthMode.None
+                },
+                OkHttpClient(),
+            ),
+            scope,
+        ) { subscription }
 
     private fun alert(
         id: String,

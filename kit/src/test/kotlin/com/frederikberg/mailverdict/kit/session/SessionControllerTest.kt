@@ -53,8 +53,20 @@ class SessionControllerTest {
             tokens,
             addresses,
             connectivity,
+            "Test phone",
             liveUpdates = false,
         )
+
+    /** The whole browser round trip, ending signed in; [revocable] makes the provider name a revocation endpoint. */
+    private fun signIn(
+        controller: SessionController,
+        revocable: Boolean = false,
+    ) {
+        serveAuthConfig()
+        if (revocable) server.script(OidcFixtures.DISCOVERY, OidcFixtures.discovery(server, revocable = true))
+        val url = runBlocking { controller.beginOidcSignIn(server.baseUrl) }!!
+        runBlocking { controller.completeOidcSignIn("$callbacks?code=c&state=${stateOf(url)}") }
+    }
 
     private fun signedInConnection(controller: SessionController) =
         (controller.state.value as SessionState.SignedIn).connection
@@ -85,7 +97,7 @@ class SessionControllerTest {
     @Test
     fun aStoredCredentialAndAddressBringTheConnectionBackAfterARestart() {
         server.script("/api/me", TestServer.json(OidcFixtures.ME))
-        tokens.write(AuthMode.Bearer("stored"))
+        tokens.write(AuthMode.Oidc(OidcFixtures.tokens(server.baseUrl, access = "stored")))
         addresses.write(server.baseUrl)
         val controller = controller()
         controller.restore()
@@ -96,33 +108,9 @@ class SessionControllerTest {
     }
 
     @Test
-    fun aPastedTokenIsTriedBeforeItIsStored() {
-        server.script("/api/me", TestServer.jsonError(401, "not_authenticated"))
-        val controller = controller()
-        runBlocking { controller.signInWithToken(server.baseUrl, "wrong") }
-
-        assertTrue(controller.signInStatus.value is SignInStatus.Failed)
-        assertNull(tokens.read())
-        assertNull(addresses.read())
-        assertEquals(SessionState.SignedOut(), controller.state.value)
-    }
-
-    @Test
-    fun aGoodPastedTokenSignsInAndIsRemembered() {
-        server.script("/api/me", TestServer.json(OidcFixtures.ME))
-        val controller = controller()
-        runBlocking { controller.signInWithToken("  ${server.baseUrl}  ", " good ") }
-
-        signedInConnection(controller)
-        assertEquals(AuthMode.Bearer("good"), tokens.read())
-        assertEquals(server.baseUrl, addresses.read())
-        assertEquals(SignInStatus.Idle, controller.signInStatus.value)
-    }
-
-    @Test
     fun anAddressWithoutASchemeIsReportedNotTried() {
         val controller = controller()
-        runBlocking { controller.signInWithToken("mail.example.com", "token") }
+        runBlocking { controller.beginOidcSignIn("mail.example.com") }
 
         val failed = controller.signInStatus.value as SignInStatus.Failed
         assertTrue(failed.message, "https://" in failed.message)
@@ -130,13 +118,15 @@ class SessionControllerTest {
     }
 
     @Test
-    fun aServerWithoutSignInOfItsOwnPointsToTheTokenMode() {
+    fun aServerWithoutSignInOfItsOwnSaysSo() {
         serveAuthConfig(clientId = null)
         val controller = controller()
 
         assertNull(runBlocking { controller.beginOidcSignIn(server.baseUrl) })
 
-        assertEquals(true, (controller.signInStatus.value as SignInStatus.Failed).tokenModeSuggested)
+        val failed = controller.signInStatus.value as SignInStatus.Failed
+        assertEquals("This server does not offer sign-in from the app.", failed.message)
+        assertEquals(SessionState.SignedOut(), controller.state.value)
     }
 
     @Test
@@ -203,9 +193,8 @@ class SessionControllerTest {
 
     @Test
     fun aCredentialTheServerRefusesEndsTheSessionAndSaysSo() {
-        server.script("/api/me", TestServer.json(OidcFixtures.ME))
         val controller = controller()
-        runBlocking { controller.signInWithToken(server.baseUrl, "good") }
+        signIn(controller)
         val connection = signedInConnection(controller)
         server.script("/api/me", TestServer.jsonError(401, "token_expired"))
 
@@ -219,9 +208,8 @@ class SessionControllerTest {
     /** Every request in flight when the credential dies reports its own refusal; the session ends once, cleanly. */
     @Test
     fun manyRequestsRefusedTogetherEndTheSessionOnce() {
-        server.script("/api/me", TestServer.json(OidcFixtures.ME))
         val controller = controller()
-        runBlocking { controller.signInWithToken(server.baseUrl, "good") }
+        signIn(controller)
         val connection = signedInConnection(controller)
         server.script("/api/me", TestServer.jsonError(401, "token_expired"))
         val states = mutableListOf<SessionState>()
@@ -254,9 +242,16 @@ class SessionControllerTest {
                 }
             }
         val controller =
-            SessionController(scope, OkHttpClient(), slowStore, addresses, connectivity, liveUpdates = false)
-        server.script("/api/me", TestServer.json(OidcFixtures.ME))
-        runBlocking { controller.signInWithToken(server.baseUrl, "good") }
+            SessionController(
+                scope,
+                OkHttpClient(),
+                slowStore,
+                addresses,
+                connectivity,
+                "Test phone",
+                liveUpdates = false,
+            )
+        signIn(controller)
         val connection = signedInConnection(controller)
         server.script("/api/me", TestServer.jsonError(401, "token_expired"))
 
@@ -269,10 +264,83 @@ class SessionControllerTest {
     }
 
     @Test
-    fun signingOutForgetsTheCredentialButKeepsTheAddress() {
-        server.script("/api/me", TestServer.json(OidcFixtures.ME))
+    fun everyRequestCarriesTheDeviceName() {
         val controller = controller()
-        runBlocking { controller.signInWithToken(server.baseUrl, "good") }
+        signIn(controller)
+
+        runBlocking { signedInConnection(controller).api.getMe() }
+
+        assertEquals("Test phone", server.requestsTo("/api/auth/config").last().headers["X-Device-Name"])
+        assertEquals("Test phone", server.requestsTo("/api/me").last().headers["X-Device-Name"])
+    }
+
+    /** A revoked device would only get another token for the same device from a renewal, so none is asked for. */
+    @Test
+    fun aRevokedDeviceIsSignedOutWithoutRenewingTheToken() {
+        val controller = controller()
+        signIn(controller)
+        val connection = signedInConnection(controller)
+        server.script("/api/me", TestServer.jsonError(401, "device_revoked"))
+        val tokenRequests = server.requestsTo(OidcFixtures.TOKEN).size
+
+        runCatching { runBlocking { connection.api.getMe() } }
+
+        val out = controller.state.value as SessionState.SignedOut
+        assertEquals(true, out.rejection?.deviceRevoked)
+        assertNull(tokens.read())
+        assertEquals(tokenRequests, server.requestsTo(OidcFixtures.TOKEN).size)
+    }
+
+    @Test
+    fun signingOutAsksTheProviderToRevokeTheRefreshToken() {
+        server.script(OidcFixtures.REVOKE, TestServer.status(200))
+        val controller = controller()
+        signIn(controller, revocable = true)
+
+        controller.signOut()
+
+        val body = awaitBody(OidcFixtures.REVOKE)
+        assertTrue(body, "token=refresh-1" in body)
+        assertTrue(body, "token_type_hint=refresh_token" in body)
+        assertTrue(body, "client_id=${OidcFixtures.CLIENT_ID}" in body)
+        assertNull(tokens.read())
+    }
+
+    @Test
+    fun signingOutDoesNotWaitForAProviderThatIsNotThere() {
+        val controller = controller()
+        signIn(controller, revocable = true)
+        server.close()
+
+        controller.signOut()
+
+        assertEquals(SessionState.SignedOut(), controller.state.value)
+        assertNull(tokens.read())
+    }
+
+    @Test
+    fun aProviderWithoutRevocationIsNotAskedToRevokeAnything() {
+        val controller = controller()
+        signIn(controller)
+
+        controller.signOut()
+
+        Thread.sleep(300)
+        assertTrue(server.requestsTo(OidcFixtures.REVOKE).isEmpty())
+    }
+
+    private fun awaitBody(path: String): String {
+        repeat(100) {
+            server.requestsTo(path).firstOrNull()?.let { return OidcFixtures.bodyOf(it) }
+            Thread.sleep(50)
+        }
+        error("no request to $path")
+    }
+
+    @Test
+    fun signingOutForgetsTheCredentialButKeepsTheAddress() {
+        val controller = controller()
+        signIn(controller)
 
         controller.signOut()
 

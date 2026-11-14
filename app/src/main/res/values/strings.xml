@@ -14,12 +14,7 @@
     <string name="signin_cancel">Cancel</string>
     <string name="signin_cleartext_warning">This address is http, not https: what you sign in with travels in the clear.</string>
     <string name="signin_rejected">Your sign-in was refused. Sign in again.</string>
-    <string name="signin_advanced_show">Advanced: sign in with a token</string>
-    <string name="signin_advanced_hide">Hide advanced options</string>
-    <string name="signin_token_label">Access token</string>
-    <string name="signin_token_paste">Paste</string>
-    <string name="signin_token_button">Sign in with token</string>
-    <string name="signin_token_note">A pasted token is never renewed. When the server stops accepting it, you sign in again.</string>
+    <string name="signin_device_revoked">This device was signed out. Sign in again to keep using MailVerdict here.</string>
 
     <string name="mailboxes_title">Mailboxes</string>
     <string name="mailboxes_unified">Unified</string>

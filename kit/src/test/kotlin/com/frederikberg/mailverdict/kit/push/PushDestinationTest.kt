@@ -24,7 +24,12 @@ class PushDestinationTest {
     @After
     fun stop() = server.close()
 
-    private val api by lazy { ApiClient(RequestFactory(server.baseUrl) { AuthMode.None }, OkHttpClient()) }
+    private val api by lazy {
+        ApiClient(
+            RequestFactory(server.baseUrl, "Test phone") { AuthMode.None },
+            OkHttpClient(),
+        )
+    }
 
     private fun resolver(locate: suspend (String) -> MessageLocation) =
         MessagePlaceResolver(locate, unifiedViews = { emptyList() }, recent = InMemoryRecentViewRecord())

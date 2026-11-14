@@ -4,6 +4,7 @@ import com.frederikberg.mailverdict.kit.live.LiveEventHub
 import com.frederikberg.mailverdict.kit.live.NetworkStatus
 import com.frederikberg.mailverdict.kit.live.Reachability
 import com.frederikberg.mailverdict.kit.net.ApiClient
+import com.frederikberg.mailverdict.kit.net.ApiError
 import com.frederikberg.mailverdict.kit.stores.MeStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -11,10 +12,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
-/** The credential was refused, or the user was disabled; [detail] is what the server said, if anything. */
+/** The credential was refused, the user was disabled or the device was revoked; [detail] is what the server said, if anything. */
 data class Rejection(
     val detail: String?,
-)
+) {
+    /** The server signed this device out from its list of devices, as opposed to refusing a credential. */
+    val deviceRevoked: Boolean get() = detail == ApiError.DEVICE_REVOKED_DETAIL
+}
 
 /** Whether the app has a credential to work with. */
 sealed interface SessionState {
@@ -32,7 +36,7 @@ sealed interface SessionState {
 sealed interface SignInStatus {
     data object Idle : SignInStatus
 
-    /** Asking the server which provider to use, or checking a pasted token. */
+    /** Asking the server which provider to use. */
     data object Working : SignInStatus
 
     /** The browser is open on the provider's page; nothing comes back until the person finishes there. */
@@ -41,10 +45,9 @@ sealed interface SignInStatus {
     /** The browser returned; the code is being traded for a token. */
     data object Exchanging : SignInStatus
 
-    /** [message] is in words for the person; [tokenModeSuggested] when the server offers no sign-in of its own. */
+    /** [message] is in words for the person. */
     data class Failed(
         val message: String,
-        val tokenModeSuggested: Boolean = false,
     ) : SignInStatus
 }
 

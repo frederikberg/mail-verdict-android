@@ -389,7 +389,7 @@ class SseClient(
         val error = ApiError.from(status, body)
         val refresher = credentialRefresher
         return when {
-            error.isDisabled -> AttemptResult.SessionEnded
+            error.isDisabled || error.isDeviceRevoked -> AttemptResult.SessionEnded
             !error.isAuthenticationFailure -> AttemptResult.Failed
             refresher == null || renewedAfterRefusal -> AttemptResult.SessionEnded
             else -> AttemptResult.Renewed(refresher.refresh(afterRejectionOf = bearer))

@@ -26,11 +26,13 @@ the browser leg of sign-in) are interfaces in `:kit` with the real implementatio
 The server sits behind a login proxy, so a refused request means one of three things, and
 `ApiError` tells them apart: a `401` or a bare non-JSON `403` (the proxy rejecting the token) is a
 rejected credential; a `403` with a JSON `detail` is the app refusing that one request and leaves the
-person signed in; the `detail` `user_disabled` ends the session.
+person signed in; the `detail` `user_disabled` ends the session, and so does a `401` with the `detail`
+`device_revoked` (the server removed this phone from its list of devices), which is not renewed first
+since a new token would belong to the same phone. Every request carries `X-Device-Name`
+(`DeviceName` sanitises it to at most 64 characters; `DeviceNames` in `:app` picks it).
 
-- A signed-in session is an `AuthMode.Oidc` token set. Access tokens live very long, so nothing is
-  renewed ahead of time except a token whose provider stated a lifetime; the normal trigger is a
-  refusal. `TokenRefresher` renews single-flight (the provider rotates refresh tokens, so two
+- A signed-in session is an `AuthMode.Oidc` token set. Nothing is renewed ahead of time except a
+  token whose provider stated a lifetime; the normal trigger is a refusal. `TokenRefresher` renews single-flight (the provider rotates refresh tokens, so two
   simultaneous renewals would leave one caller holding a retired token) and stores the new set
   before using it. A rejected refresh token ends the session; an unreachable provider does not.
 - `ApiClient` renews and resends a refused request once. `SseClient` does the same for the event
@@ -39,8 +41,7 @@ person signed in; the `detail` `user_disabled` ends the session.
 - `LiveEventHub` turns each event into a `LiveInvalidation` (the table lives in
   `LiveInvalidation.from`), holding mail bursts for 500 ms so a store refreshes once.
 - Two things need Android and are interfaces in `:kit`: `TokenStore` (where the credential
-  survives a restart) and `Connectivity` (the device's network path). A pasted bearer token is
-  `AuthMode.Bearer` and is never renewed.
+  survives a restart) and `Connectivity` (the device's network path).
 
 ## Signing in and the session
 
@@ -54,19 +55,21 @@ the only place that decides between the signed-out and signed-in screens.
   controller checks scheme, host and path against the redirect it asked for, then `SignInFlow`
   checks `state` before the code is exchanged. A sign-in the process did not survive (killed
   during the browser leg) reports that it did not complete.
-- **Pasted token.** Under Advanced the person pastes a bearer token. It is tried against `/api/me`
-  before anything is stored, and is never renewed.
 - **Where the credential lives.** `SealedFileTokenStore` writes it to `files/auth.bin`, sealed with
   AES-GCM under a key held in the AndroidKeyStore (`AndroidKeystoreKey`). A file that cannot be
   opened (altered, or its key gone) reads as signed out. The server address is not a secret and is
   kept in `AppPreferences` next to the theme and which overview sections are collapsed.
 - **Ending the session.** A credential the server refuses for good (after the renewal in
   *Authentication and live updates*) or a disabled user clears the stored credential and shows the
-  sign-in screen with a notice; signing out does the same without one.
+  sign-in screen with a notice; signing out does the same without one, and also asks the provider to
+  revoke the sign-in (the `revocation_endpoint` of its discovery document, RFC 7009), best effort and
+  bounded, so the stored refresh token stops working. A `device_revoked` notice says the device was
+  signed out.
 
 The Robolectric tests cover the screens and the redirect plumbing; the real Keystore and the Custom
 Tab need a device or emulator. A stand-in server for the emulator only needs `GET /api/auth/config`,
-an OIDC discovery document, an authorize page that links to the redirect, and a token endpoint;
+an OIDC discovery document, an authorize page that links to the redirect, and a token endpoint
+(plus a revocation endpoint, if sign-out is to be seen revoking);
 debug builds accept cleartext to `127.0.0.1`, so `adb reverse` is enough to reach one.
 
 ## Checks
