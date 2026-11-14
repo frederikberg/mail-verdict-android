@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   view with script off and remote images hidden until asked for (inline images are fetched with the
   app's own credential), plain-text bodies drawn natively, attachments opened through the system,
   and the message marked read on opening.
+- Triage: mark read or unread, star, archive, delete, move to a folder, move to or out of Junk,
+  from a swipe (right archives, left deletes), from a selection of messages, and from the reader's
+  menu; deleting for good asks first. Every action shows at once, comes with an Undo where one is
+  possible, and goes through a queue that survives a restart, sends in order, retries with backoff,
+  waits while offline or while the sign-in is refused, and never moves a message that is no longer
+  where the action saw it.
 - The newest page of each list visited and every conversation opened are kept on the device and
   shown when the server cannot be reached; signing out removes them.
 - Search: text search narrowed by field (subject, from, to, body) and by time window, and search by

@@ -17,8 +17,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,7 +35,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
@@ -50,6 +55,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import com.frederikberg.mailverdict.R
+import com.frederikberg.mailverdict.actions.ActionMenuItems
+import com.frederikberg.mailverdict.actions.CollectQueueNotices
+import com.frederikberg.mailverdict.kit.actions.ActionGroup
+import com.frederikberg.mailverdict.kit.actions.QueueNotice
+import com.frederikberg.mailverdict.kit.actions.UiAction
 import com.frederikberg.mailverdict.kit.live.OfflineNotice
 import com.frederikberg.mailverdict.kit.reader.PlainBody
 import com.frederikberg.mailverdict.kit.reader.PlainText
@@ -60,10 +70,13 @@ import com.frederikberg.mailverdict.kit.reader.ReaderMessage
 import com.frederikberg.mailverdict.kit.reader.ReaderPhase
 import com.frederikberg.mailverdict.kit.reader.ReaderState
 import com.frederikberg.mailverdict.ui.OfflineCapsule
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 object ReaderTags {
     const val RETRY = "reader-retry"
     const val LIST = "reader-list"
+    const val MENU = "reader-menu"
 
     fun message(id: String) = "reader-message:$id"
 
@@ -95,8 +108,10 @@ fun ReaderScreen(
     onShowFullBody: (String) -> Unit,
     onOpenAttachment: (ReaderMessage, ReaderAttachment) -> Unit,
     onDismissNotice: () -> Unit,
+    actions: ReaderActions = ReaderActions.None,
 ) {
     val snackbar = remember { SnackbarHostState() }
+    CollectQueueNotices(actions.notices, snackbar, actions.onUndo, actions.onRetryAction)
     LaunchedEffect(state.notice) {
         state.notice?.let {
             snackbar.showSnackbar(it)
@@ -107,6 +122,28 @@ fun ReaderScreen(
         topBar = {
             TopAppBar(
                 title = {},
+                actions = {
+                    if (state.phase == ReaderPhase.Loaded && actions.groups.isNotEmpty()) {
+                        var open by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { open = true }, modifier = Modifier.testTag(ReaderTags.MENU)) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    contentDescription = stringResource(R.string.maillist_more),
+                                )
+                            }
+                            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                                ActionMenuItems(
+                                    groups = actions.groups,
+                                    onAction = {
+                                        open = false
+                                        actions.onAction(it)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
@@ -403,5 +440,18 @@ private fun linked(body: PlainBody): AnnotatedString {
             }
             append(body.text.substring(at))
         }
+    }
+}
+
+/** What the reader needs to act on the opened message: the menu's entries, Undo and Retry. */
+class ReaderActions(
+    val notices: Flow<QueueNotice>,
+    val groups: List<ActionGroup>,
+    val onAction: (UiAction) -> Unit,
+    val onUndo: (List<String>) -> Unit,
+    val onRetryAction: (String) -> Unit,
+) {
+    companion object {
+        val None = ReaderActions(emptyFlow(), emptyList(), {}, {}, {})
     }
 }

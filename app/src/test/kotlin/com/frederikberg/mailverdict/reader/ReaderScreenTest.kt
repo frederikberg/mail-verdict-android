@@ -7,6 +7,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import com.frederikberg.mailverdict.actions.ActionTags
+import com.frederikberg.mailverdict.kit.actions.ActionContext
+import com.frederikberg.mailverdict.kit.actions.MessageActionSet
+import com.frederikberg.mailverdict.kit.actions.UiAction
 import com.frederikberg.mailverdict.kit.auth.AuthMode
 import com.frederikberg.mailverdict.kit.fixtures.FixtureInterceptor
 import com.frederikberg.mailverdict.kit.fixtures.Fixtures
@@ -20,6 +24,7 @@ import com.frederikberg.mailverdict.kit.reader.ReaderState
 import com.frederikberg.mailverdict.kit.reader.ReaderStore
 import com.frederikberg.mailverdict.ui.theme.MailVerdictTheme
 import com.github.takahirom.roborazzi.captureRoboImage
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
@@ -143,5 +148,49 @@ class ReaderScreenTest {
         compose.onNodeWithText("Could not open this message: gone").assertIsDisplayed()
         compose.onNodeWithTag(ReaderTags.RETRY).performClick()
         assertEquals(listOf("retry"), events)
+    }
+
+    @Test
+    fun theMenuOffersTheSameActionsAsTheListAndReportsTheOneChosen() {
+        val state = loaded(conversation)
+        val chosen = mutableListOf<UiAction>()
+        compose.setContent {
+            MailVerdictTheme(dynamicColor = false) {
+                ReaderScreen(
+                    state = state,
+                    offline = null,
+                    web = MessageWebContext("https://fixture.invalid", { null }, {}),
+                    onBack = {},
+                    onRetry = {},
+                    onToggle = {},
+                    onShowImages = {},
+                    onShowFullBody = {},
+                    onOpenAttachment = { _, _ -> },
+                    onDismissNotice = {},
+                    actions =
+                        ReaderActions(
+                            notices = emptyFlow(),
+                            groups =
+                                MessageActionSet.groups(
+                                    ActionContext(
+                                        isRead = true,
+                                        isStarred = false,
+                                        isInTrash = false,
+                                        isInJunk = false,
+                                    ),
+                                ),
+                            onAction = { chosen += it },
+                            onUndo = {},
+                            onRetryAction = {},
+                        ),
+                )
+            }
+        }
+        compose.onNodeWithTag(ReaderTags.MENU).performClick()
+        compose.onNodeWithText("Mark as unread").assertIsDisplayed()
+        compose.onNodeWithText("Delete").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/reader-menu.png")
+        compose.onNodeWithTag(ActionTags.menu(UiAction.Archive)).performClick()
+        assertEquals(listOf(UiAction.Archive), chosen)
     }
 }

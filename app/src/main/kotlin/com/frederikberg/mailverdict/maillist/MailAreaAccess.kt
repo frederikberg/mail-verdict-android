@@ -1,6 +1,9 @@
 package com.frederikberg.mailverdict.maillist
 
 import com.frederikberg.mailverdict.AppGraph
+import com.frederikberg.mailverdict.kit.actions.FileIntentPersistence
+import com.frederikberg.mailverdict.kit.actions.InMemoryIntentPersistence
+import com.frederikberg.mailverdict.kit.actions.IntentPersistence
 import com.frederikberg.mailverdict.kit.cache.FileOfflineCache
 import com.frederikberg.mailverdict.kit.cache.NoOfflineCache
 import com.frederikberg.mailverdict.kit.cache.OfflineCache
@@ -14,7 +17,15 @@ import java.security.MessageDigest
 /** The list and reader stores of [connection], kept for as long as it lasts. */
 fun AppGraph.mailArea(connection: Connection): MailArea =
     connectionStores.get(connection, MailArea::class) { scope ->
-        MailArea(connection, scope, offlineCache(connection), mailPreferences, mailPreferences)
+        MailArea(
+            connection,
+            scope,
+            offlineCache(connection),
+            mailPreferences,
+            mailPreferences,
+            intentPersistence(connection),
+            mailPreferences,
+        )
     }
 
 /** One directory per server, so two servers never share a saved page; none at all in a fixture run, which keeps nothing. */
@@ -23,6 +34,14 @@ private fun AppGraph.offlineCache(connection: Connection): OfflineCache =
         NoOfflineCache
     } else {
         FileOfflineCache(File(mailCacheRoot, serverDirectory(connection.serverUrl)))
+    }
+
+/** What the queue has not got to the server yet is kept in files, not in the cache: the system may empty a cache, and an unsent action is not a copy of anything. */
+private fun AppGraph.intentPersistence(connection: Connection): IntentPersistence =
+    if (fixtureMode) {
+        InMemoryIntentPersistence()
+    } else {
+        FileIntentPersistence(File(actionsRoot, serverDirectory(connection.serverUrl) + ".json"))
     }
 
 private fun serverDirectory(serverUrl: String): String =

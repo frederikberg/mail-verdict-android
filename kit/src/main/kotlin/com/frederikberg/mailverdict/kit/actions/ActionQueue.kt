@@ -53,6 +53,22 @@ data class QueueState(
 ) {
     val failed: List<MailIntent> get() = intents.filter { it.state == IntentPhase.Failed }
     val hasOpen: Boolean get() = intents.any { it.isOpen }
+
+    /** "3 actions waiting for the network · 1 failed", or null when nothing needs saying. */
+    val summary: String?
+        get() {
+            val waiting = intents.count { it.isOpen && it.id in waitingIds }
+            val failedCount = failed.size
+            val parts =
+                listOfNotNull(
+                    waiting
+                        .takeIf {
+                            it > 0
+                        }?.let { "$it ${if (it == 1) "action" else "actions"} waiting for the network" },
+                    failedCount.takeIf { it > 0 }?.let { "$it failed" },
+                )
+            return parts.joinToString(" · ").ifEmpty { null }
+        }
 }
 
 /**

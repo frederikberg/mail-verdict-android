@@ -81,6 +81,8 @@ fun AppNavigation(
     versionName: String,
     onSignOut: () -> Unit,
 ) {
+    // Created with the connection, so what the last run left unsent is delivered without waiting for a screen to ask.
+    remember(connection) { graph.mailArea(connection) }
     val navController = rememberNavController()
     val alerts = remember(connection) { graph.alertsStore(connection) }
     val alertBadge by alerts.badge.collectAsState()

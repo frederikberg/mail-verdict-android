@@ -198,9 +198,16 @@ object MailFixtures {
                 "GET /api/messages/${id(1)}/thread",
                 """{"messages":[${conversation1.joinToString(",") { it.detail }}]}""",
             )
+            // Every action answers success: the list and the reader only need the request to be accepted.
+            (mails + conversation1).forEach {
+                put(
+                    "POST /api/messages/${id(it.n)}/action",
+                    """{"message_id":"${id(it.n)}","action":"mark_read","success":true,"applied":true}""",
+                )
+            }
             put(
-                "POST /api/messages/${id(1)}/action",
-                """{"message_id":"${id(1)}","action":"mark_read","success":true}""",
+                "POST /api/accounts/${Fixtures.PRIVATE_ACCOUNT}/messages/bulk-action",
+                """{"action":"archive","success":true,"affected_count":1}""",
             )
         }
 }

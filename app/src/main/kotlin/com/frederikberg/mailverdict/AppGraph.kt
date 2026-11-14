@@ -52,6 +52,8 @@ class AppGraph private constructor(
     val mailPreferences: AndroidMailListPreferences,
     /** Everything mail kept on the device lives under here and is removed on sign-out. */
     val mailCacheRoot: File,
+    /** Actions not yet delivered, one file per server; removed on sign-out. */
+    val actionsRoot: File,
     /** Notifications through the phone's UnifiedPush distributor. */
     val push: PushController,
     /** A destination a notification tap asked for, until a screen has shown it. */
@@ -93,8 +95,14 @@ class AppGraph private constructor(
                 }
             session.restore()
             val mailCacheRoot = File(context.cacheDir, "mail")
+            val actionsRoot = File(context.filesDir, "actions")
             val connectionStores =
-                ConnectionStores(scope, session.state) { if (!fixtureMode) FileOfflineCache(mailCacheRoot).clear() }
+                ConnectionStores(scope, session.state) {
+                    if (!fixtureMode) {
+                        FileOfflineCache(mailCacheRoot).clear()
+                        actionsRoot.deleteRecursively()
+                    }
+                }
             val push = createPush(context, fixtureMode, session, scope)
             Timber.i("app graph created, fixtureMode=%s", fixtureMode)
             return AppGraph(
@@ -107,6 +115,7 @@ class AppGraph private constructor(
                 connectionStores,
                 AndroidMailListPreferences(context, fixtureMode),
                 mailCacheRoot,
+                actionsRoot,
                 push,
                 DeepLinks(),
             )
