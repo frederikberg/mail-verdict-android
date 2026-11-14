@@ -15,7 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   not good anywhere afterwards. The request is best effort and never delays the sign-out.
 - A device the server has removed from its list is signed out with its own message, without a token
   renewal first.
-
 - Notifications through Google's push service where Google Play services exist, over the push relay
   the iPhone app uses and with the same sealed alerts: nothing to install. The helper-app path stays
   for phones without Google services, and a phone that used it is moved over on the first start. A
