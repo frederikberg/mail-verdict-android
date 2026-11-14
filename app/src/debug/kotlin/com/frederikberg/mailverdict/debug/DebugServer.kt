@@ -1,23 +1,25 @@
 package com.frederikberg.mailverdict.debug
 
 import android.util.Log
-import com.frederikberg.mailverdict.AppGraph
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
  * Loopback HTTP server for driving a debug build from `adb forward`:
  * - `/health` answers while the process is alive
- * - `/state` is the app's current wiring
+ * - `/state` is the app's current wiring and whether it is signed in
  * - `/logs?level=WARN` is the in-memory log, filtered to that level and above
  *
  * Handlers run on the server's own worker thread. A route that touches Compose state must hop to
  * the main looper first.
  */
 class DebugServer(
-    private val graph: AppGraph,
+    /** The wiring the app reports about itself, read on every request. */
+    private val appState: () -> JsonObject,
     private val logs: RingBufferLogTree,
     private val versionName: String,
     port: Int,
@@ -29,10 +31,7 @@ class DebugServer(
             "/state" ->
                 json(
                     Response.Status.OK,
-                    buildJsonObject {
-                        put("fixtureMode", graph.fixtureMode)
-                        put("versionName", versionName)
-                    },
+                    JsonObject(appState() + ("versionName" to JsonPrimitive(versionName))),
                 )
             "/logs" -> logs(session.parameters["level"]?.firstOrNull())
             else -> json(Response.Status.NOT_FOUND, error("no route ${session.uri}"))

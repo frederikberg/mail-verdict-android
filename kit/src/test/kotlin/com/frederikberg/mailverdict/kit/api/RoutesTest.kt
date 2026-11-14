@@ -88,6 +88,7 @@ class RoutesTest {
         call { api.listAccounts() }
         call { api.getSyncStatus(id) }
         call { api.listFolders(id) }
+        call { api.getFolderOrder(id) }
         call { api.listUnifiedFolders() }
         call { api.listIdentities(id) }
         call { api.listMessages(id, folderId = id, isSeen = false, before = id, after = id, around = id, limit = 50) }

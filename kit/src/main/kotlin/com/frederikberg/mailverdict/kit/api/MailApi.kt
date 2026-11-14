@@ -5,6 +5,7 @@ import com.frederikberg.mailverdict.contract.BulkActionRequest
 import com.frederikberg.mailverdict.contract.BulkActionResponse
 import com.frederikberg.mailverdict.contract.FeedbackRequest
 import com.frederikberg.mailverdict.contract.FeedbackResponse
+import com.frederikberg.mailverdict.contract.FolderOrderResponse
 import com.frederikberg.mailverdict.contract.FolderResponse
 import com.frederikberg.mailverdict.contract.IdentityResponse
 import com.frederikberg.mailverdict.contract.MessageActionRequest
@@ -30,6 +31,10 @@ suspend fun ApiClient.getSyncStatus(accountId: String): SyncStatusResponse =
 
 suspend fun ApiClient.listFolders(accountId: String): List<FolderResponse> =
     send(ListSerializer(FolderResponse.serializer()), "/accounts/$accountId/folders")
+
+/** An account's folders with counts, ordered as the person saved them (alphabetical when nothing was saved). */
+suspend fun ApiClient.getFolderOrder(accountId: String): FolderOrderResponse =
+    send(FolderOrderResponse.serializer(), "/accounts/$accountId/folder-order")
 
 suspend fun ApiClient.listUnifiedFolders(): List<UnifiedFolderResponse> =
     send(ListSerializer(UnifiedFolderResponse.serializer()), "/unified/folders")

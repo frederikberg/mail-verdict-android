@@ -1,9 +1,9 @@
 package com.frederikberg.mailverdict.debug
 
 import android.util.Log
-import com.frederikberg.mailverdict.AppGraph
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -21,7 +21,13 @@ class DebugServerTest {
 
     @Before
     fun start() {
-        server = DebugServer(AppGraph.create(fixtureMode = true), logs, versionName = "9.9.9", port = 0)
+        server =
+            DebugServer(
+                { JsonObject(mapOf("fixtureMode" to JsonPrimitive(true))) },
+                logs,
+                versionName = "9.9.9",
+                port = 0,
+            )
         server.start()
     }
 

@@ -22,3 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   never signs anyone out.
 - The live-update stream with reconnects that resume from the last event, a watchdog for a silent
   connection, and an invalidation table that tells each store what an event changed.
+- The sign-in screen: the server address, "Sign in" through a Chrome Custom Tab that returns to
+  the app on `mailverdict://auth/callback`, and an Advanced mode for a pasted token. A refused
+  credential brings the screen back and says so.
+- The session lives in the Android Keystore: the token set is sealed with a non-exportable AES-GCM
+  key and survives a restart; signing out removes it.
+- Navigation, the mailbox overview (unified views, then each account's folders in lead order with
+  unread counts, collapsible, refreshed live), an offline capsule, and settings with theme, the
+  signed-in user and sign-out.

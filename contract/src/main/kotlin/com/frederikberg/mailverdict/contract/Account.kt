@@ -70,6 +70,24 @@ data class FolderResponse(
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+/** One folder in `GET /accounts/{id}/folder-order`: the account's visible-or-hidden folders in the order the person saved. */
+@Serializable
+data class FolderOrderItem(
+    @SerialName("folder_id") val folderId: String,
+    @SerialName("imap_name") val imapName: String,
+    @SerialName("display_name") val displayName: String? = null,
+    @SerialName("special_use") val specialUse: String? = null,
+    @SerialName("is_visible") val isVisible: Boolean = true,
+    val kind: FolderKind = FolderKind.Imap,
+    @SerialName("total_count") val totalCount: Int = 0,
+    @SerialName("unread_count") val unreadCount: Int = 0,
+)
+
+@Serializable
+data class FolderOrderResponse(
+    val folders: List<FolderOrderItem>,
+)
+
 @Serializable
 data class IdentityResponse(
     val id: String,
