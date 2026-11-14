@@ -5,10 +5,13 @@ import com.frederikberg.mailverdict.contract.ContractJson
 import com.frederikberg.mailverdict.kit.auth.AuthMode
 import com.frederikberg.mailverdict.kit.auth.InMemoryTokenStore
 import com.frederikberg.mailverdict.kit.auth.SealedFileTokenStore
+import com.frederikberg.mailverdict.kit.cache.FileOfflineCache
 import com.frederikberg.mailverdict.kit.fixtures.FixtureInterceptor
 import com.frederikberg.mailverdict.kit.fixtures.Fixtures
+import com.frederikberg.mailverdict.kit.session.ConnectionStores
 import com.frederikberg.mailverdict.kit.session.InMemoryServerAddressStore
 import com.frederikberg.mailverdict.kit.session.SessionController
+import com.frederikberg.mailverdict.maillist.AndroidMailListPreferences
 import com.frederikberg.mailverdict.platform.AlwaysOnline
 import com.frederikberg.mailverdict.platform.AndroidConnectivity
 import com.frederikberg.mailverdict.platform.AndroidKeystoreKey
@@ -34,6 +37,11 @@ class AppGraph private constructor(
     val appScope: CoroutineScope,
     val preferences: AppPreferences,
     val session: SessionController,
+    /** Stores kept for as long as one sign-in lasts. */
+    val connectionStores: ConnectionStores,
+    val mailPreferences: AndroidMailListPreferences,
+    /** Everything mail kept on the device lives under here and is removed on sign-out. */
+    val mailCacheRoot: File,
 ) {
     companion object {
         /** The fixture session's server; nothing listens there, the interceptor answers first. */
@@ -70,8 +78,21 @@ class AppGraph private constructor(
                     )
                 }
             session.restore()
+            val mailCacheRoot = File(context.cacheDir, "mail")
+            val connectionStores =
+                ConnectionStores(scope, session.state) { if (!fixtureMode) FileOfflineCache(mailCacheRoot).clear() }
             Timber.i("app graph created, fixtureMode=%s", fixtureMode)
-            return AppGraph(fixtureMode, ContractJson, client, scope, preferences, session)
+            return AppGraph(
+                fixtureMode,
+                ContractJson,
+                client,
+                scope,
+                preferences,
+                session,
+                connectionStores,
+                AndroidMailListPreferences(context, fixtureMode),
+                mailCacheRoot,
+            )
         }
     }
 }

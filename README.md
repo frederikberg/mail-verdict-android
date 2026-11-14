@@ -9,9 +9,8 @@ self-hosted mail client with an AI spam layer. The app talks to a MailVerdict se
 and SSE API; it never speaks IMAP or SMTP itself, and the web UI of the server is the reference
 for what it ports.
 
-The project is early: signing in (through the server's identity provider, or with a pasted token)
-and the mailbox overview work; the message list and reader do not exist yet. There is no release
-yet.
+The project is early: signing in (through the server's identity provider, or with a pasted token),
+the mailbox overview, the message list and the reader work. There is no release yet.
 
 ## Building
 

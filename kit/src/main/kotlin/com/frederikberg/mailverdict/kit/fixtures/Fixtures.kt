@@ -80,5 +80,5 @@ object Fixtures {
                      "account_name":"Work","account_emoji":"💼","imap_name":"INBOX","special_use":"inbox"}]}]
                 """.trimIndent(),
             "GET /api/outbox" to "[]",
-        )
+        ) + MailFixtures.routes
 }
