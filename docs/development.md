@@ -42,6 +42,33 @@ person signed in; the `detail` `user_disabled` ends the session.
   survives a restart) and `Connectivity` (the device's network path). A pasted bearer token is
   `AuthMode.Bearer` and is never renewed.
 
+## Signing in and the session
+
+`SessionController` (in `:kit`) owns whether the app has a credential and what is built on it: one
+`ApiClient`, one live stream and one `MeStore` per sign-in, closed and replaced on the next. It is
+the only place that decides between the signed-out and signed-in screens.
+
+- **Browser sign-in.** The person types the server address; the app reads `GET /api/auth/config`,
+  discovers the provider, and opens the authorization address in a Chrome Custom Tab. The provider
+  redirects to `mailverdict://auth/callback`, which `RedirectActivity` hands to the controller. The
+  controller checks scheme, host and path against the redirect it asked for, then `SignInFlow`
+  checks `state` before the code is exchanged. A sign-in the process did not survive (killed
+  during the browser leg) reports that it did not complete.
+- **Pasted token.** Under Advanced the person pastes a bearer token. It is tried against `/api/me`
+  before anything is stored, and is never renewed.
+- **Where the credential lives.** `SealedFileTokenStore` writes it to `files/auth.bin`, sealed with
+  AES-GCM under a key held in the AndroidKeyStore (`AndroidKeystoreKey`). A file that cannot be
+  opened (altered, or its key gone) reads as signed out. The server address is not a secret and is
+  kept in `AppPreferences` next to the theme and which overview sections are collapsed.
+- **Ending the session.** A credential the server refuses for good (after the renewal in
+  *Authentication and live updates*) or a disabled user clears the stored credential and shows the
+  sign-in screen with a notice; signing out does the same without one.
+
+The Robolectric tests cover the screens and the redirect plumbing; the real Keystore and the Custom
+Tab need a device or emulator. A stand-in server for the emulator only needs `GET /api/auth/config`,
+an OIDC discovery document, an authorize page that links to the redirect, and a token endpoint;
+debug builds accept cleartext to `127.0.0.1`, so `adb reverse` is enough to reach one.
+
 ## Checks
 
 ```bash

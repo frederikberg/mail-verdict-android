@@ -19,7 +19,10 @@ class SignInFlow(
         internal val pkce: Pkce.Codes,
         internal val config: AuthConfigResponse,
         internal val metadata: OidcProviderMetadata,
-    )
+    ) {
+        /** The address the provider sends the browser back to. */
+        val redirectUri: String get() = config.redirectUri
+    }
 
     suspend fun begin(config: AuthConfigResponse): Pending {
         if (config.clientId.isNullOrEmpty()) throw OidcError.SignInUnavailable()
