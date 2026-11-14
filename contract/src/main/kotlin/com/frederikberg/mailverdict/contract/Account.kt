@@ -67,6 +67,8 @@ data class FolderResponse(
     @SerialName("last_synced_at") val lastSyncedAt: String? = null,
     @SerialName("sync_error") val syncError: String? = null,
     @SerialName("unified_view_ids") val unifiedViewIds: List<String> = emptyList(),
+    /** Whether mail arriving here is classified and embedded: the folder's role and its own switch combined. */
+    @SerialName("pipeline_enabled") val pipelineEnabled: Boolean = true,
     @SerialName("created_at") val createdAt: String? = null,
 )
 
@@ -79,6 +81,7 @@ data class FolderOrderItem(
     @SerialName("special_use") val specialUse: String? = null,
     @SerialName("is_visible") val isVisible: Boolean = true,
     val kind: FolderKind = FolderKind.Imap,
+    @SerialName("pipeline_enabled") val pipelineEnabled: Boolean = true,
     @SerialName("total_count") val totalCount: Int = 0,
     @SerialName("unread_count") val unreadCount: Int = 0,
 )
