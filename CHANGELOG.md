@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A tag also builds the signed app bundle and delivers the build to Firebase App Distribution testers
+  and to the Google Play internal testing track, each once its credential is configured; without
+  one the step is skipped with a notice. The Firebase project configuration is written from a
+  repository secret for the build.
 - Every request names the phone in an `X-Device-Name` header (the name set in the phone's settings,
   else manufacturer and model), so the server's list of signed-in devices can show it.
 - Signing out also asks the identity provider to revoke the sign-in, so the stored refresh token is
