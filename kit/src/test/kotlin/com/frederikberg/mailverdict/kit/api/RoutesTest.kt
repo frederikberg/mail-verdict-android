@@ -92,7 +92,9 @@ class RoutesTest {
         call { api.listUnifiedFolders() }
         call { api.listIdentities(id) }
         call { api.listMessages(id, folderId = id, isSeen = false, before = id, after = id, around = id, limit = 50) }
-        call { api.listUnifiedMessages("Inboxes", isSeen = true, before = id, limit = 50) }
+        call { api.listUnifiedMessages("Inboxes", isSeen = true, before = id, after = id, around = id, limit = 50) }
+        call { api.locateMessage(id) }
+        call { api.triggerSync(id) }
         call { api.getMessage(id, loadImages = true) }
         call { api.getThread(id, loadImages = true) }
         call { api.getQuote(id) }
