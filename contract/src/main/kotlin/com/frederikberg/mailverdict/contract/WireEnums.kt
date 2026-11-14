@@ -127,7 +127,8 @@ value class PushTransport(
     companion object {
         val WebPush = PushTransport("webpush")
         val Apns = PushTransport("apns")
-        val known: Set<String> = setOf(WebPush.raw, Apns.raw)
+        val Native = PushTransport("native")
+        val known: Set<String> = setOf(WebPush.raw, Apns.raw, Native.raw)
     }
 }
 

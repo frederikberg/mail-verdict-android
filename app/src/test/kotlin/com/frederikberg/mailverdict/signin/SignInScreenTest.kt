@@ -103,6 +103,14 @@ class SignInScreenTest {
     }
 
     @Test
+    fun anUnrecognisedDeviceIsToldTheSameAsARevokedOne() {
+        show(state(rejection = Rejection("device_unrecognised")))
+
+        compose.onNodeWithText("This device was signed out", substring = true).assertExists()
+        compose.onNodeWithText("device_unrecognised").assertDoesNotExist()
+    }
+
+    @Test
     fun anHttpAddressIsWarnedAbout() {
         show(state(serverUrl = "http://10.0.0.5:8000"))
 
