@@ -97,6 +97,7 @@ dependencies {
     implementation(libs.androidx.browser)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.timber)
+    implementation(libs.unifiedpush.connector)
 
     debugImplementation(libs.nanohttpd)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

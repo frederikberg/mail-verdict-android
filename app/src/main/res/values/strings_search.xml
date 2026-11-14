@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_title">Search</string>
+    <string name="search_placeholder">Search mail</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_mode_text">Text</string>
+    <string name="search_mode_semantic">By meaning</string>
+    <string name="search_field_subject">Subject</string>
+    <string name="search_field_from">From</string>
+    <string name="search_field_to">To</string>
+    <string name="search_field_body">Body</string>
+    <string name="search_window_any">Any time</string>
+    <string name="search_window_today">Today</string>
+    <string name="search_window_since_yesterday">Since yesterday</string>
+    <string name="search_window_7_days">Last 7 days</string>
+    <string name="search_window_30_days">Last 30 days</string>
+    <string name="search_scope">In %1$s</string>
+    <string name="search_scope_clear">Search everywhere</string>
+    <string name="search_enter_query">Type at least two letters to search.</string>
+    <string name="search_select_folder">No folder is selected to search in.</string>
+    <string name="search_by_meaning">Looking for matches by meaning…</string>
+    <string name="search_error">Search failed: %1$s</string>
+    <string name="search_no_results">Nothing matches.</string>
+    <string name="search_less_likely">Less likely matches</string>
+    <string name="search_semantic_unavailable">This server cannot search by meaning right now, so these are text matches.</string>
+</resources>

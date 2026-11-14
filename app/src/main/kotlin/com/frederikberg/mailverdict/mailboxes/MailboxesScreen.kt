@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,6 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.frederikberg.mailverdict.R
+import com.frederikberg.mailverdict.alerts.AlertBell
 import com.frederikberg.mailverdict.contract.FolderKind
 import com.frederikberg.mailverdict.kit.live.OfflineNotice
 import com.frederikberg.mailverdict.kit.stores.mailboxes.AccountConnectionState
@@ -48,6 +50,7 @@ import com.frederikberg.mailverdict.ui.OfflineCapsule
 object MailboxesTags {
     const val LIST = "mailboxes-list"
     const val SETTINGS = "mailboxes-settings"
+    const val SEARCH = "mailboxes-search"
 
     fun folder(id: String) = "folder:$id"
 
@@ -72,12 +75,19 @@ fun MailboxesScreen(
     onOpenFolder: (MailboxesFolderRow) -> Unit,
     onOpenUnified: (MailboxesUnifiedRow) -> Unit,
     onOpenSettings: () -> Unit,
+    alertBadge: Int = 0,
+    onOpenSearch: () -> Unit = {},
+    onOpenAlerts: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.mailboxes_title)) },
                 actions = {
+                    IconButton(onClick = onOpenSearch, modifier = Modifier.testTag(MailboxesTags.SEARCH)) {
+                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_title))
+                    }
+                    AlertBell(alertBadge, onOpenAlerts)
                     IconButton(onClick = onOpenSettings, modifier = Modifier.testTag(MailboxesTags.SETTINGS)) {
                         Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.mailboxes_settings))
                     }
