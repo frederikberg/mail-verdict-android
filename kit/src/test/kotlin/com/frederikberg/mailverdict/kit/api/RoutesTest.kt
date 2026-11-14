@@ -93,7 +93,6 @@ class RoutesTest {
         call { api.listIdentities(id) }
         call { api.listMessages(id, folderId = id, isSeen = false, before = id, after = id, around = id, limit = 50) }
         call { api.listUnifiedMessages("Inboxes", isSeen = true, before = id, after = id, around = id, limit = 50) }
-        call { api.locateMessage(id) }
         call { api.triggerSync(id) }
         call { api.getMessage(id, loadImages = true) }
         call { api.getThread(id, loadImages = true) }
@@ -141,6 +140,7 @@ class RoutesTest {
             )
         }
         call { api.deletePushSubscription(id) }
+        call { api.sendTestPush(id) }
         call { api.createOutbox(OutboxCreateRequest(accountId = id, kind = "send", to = listOf("a@example.com"))) }
         call { api.listOutbox(id, "queued") }
         call { api.listPendingSends(id) }

@@ -81,3 +81,7 @@ suspend fun ApiClient.deletePushSubscription(subscriptionId: String) =
         "/alerts/subscriptions/$subscriptionId",
         "DELETE",
     )
+
+/** Sends one of the caller's devices "Notifications are working" without creating an alert. */
+suspend fun ApiClient.sendTestPush(subscriptionId: String) =
+    sendNoContent("/alerts/subscriptions/$subscriptionId/test", "POST")
