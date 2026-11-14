@@ -56,6 +56,7 @@ class ContractTest {
             "SyncStatusResponse" to SyncStatusResponse.serializer(),
             "FolderResponse" to FolderResponse.serializer(),
             "FolderOrderItem" to FolderOrderItem.serializer(),
+            "FolderPrefsUpdate" to FolderPrefsUpdate.serializer(),
             "FolderOrderResponse" to FolderOrderResponse.serializer(),
             "IdentityResponse" to IdentityResponse.serializer(),
             "UnifiedFolderSource" to UnifiedFolderSource.serializer(),
