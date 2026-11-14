@@ -86,6 +86,17 @@ data class FolderOrderItem(
     @SerialName("unread_count") val unreadCount: Int = 0,
 )
 
+/** `PATCH /folders/{id}/prefs`: only the fields present are changed. */
+@Serializable
+data class FolderPrefsUpdate(
+    @SerialName("display_name") val displayName: String? = null,
+    @SerialName("is_visible") val isVisible: Boolean? = null,
+    @SerialName("pipeline_enabled") val pipelineEnabled: Boolean? = null,
+    @SerialName("real_time") val realTime: Boolean? = null,
+    @SerialName("special_use_override") val specialUseOverride: String? = null,
+    @SerialName("unified_view_ids") val unifiedViewIds: List<String>? = null,
+)
+
 @Serializable
 data class FolderOrderResponse(
     val folders: List<FolderOrderItem>,
