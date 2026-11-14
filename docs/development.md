@@ -106,6 +106,34 @@ The offline cache keeps the newest page of each list visited and each conversati
 the app's cache directory, one directory per server, and is emptied on sign-out. Fixture mode keeps
 nothing.
 
+## Search, alerts and notifications
+
+Search keeps its logic in `:kit` (`search/`): `SearchStore` debounces typing, cancels what a newer
+query supersedes, asks twice in semantic mode (the text list shows until the answer by meaning
+replaces it) and falls back to the text list when the server answers `503` to a semantic query.
+`SearchBackend` is the seam the store's timing tests run against in virtual time.
+
+Notifications use the UnifiedPush connector, so a distributor app (ntfy, Sunup) delivers them
+instead of Google's service. The server already sends Web Push to the subscriptions a signed-in user
+registers, so the app registers the distributor's endpoint and key set as one:
+
+- `PushController` (`:kit`, `push/`) is the state machine: it reads the server's VAPID key, asks the
+  distributor for an endpoint (`UnifiedPush.register` with the key), and posts the endpoint to
+  `POST /api/alerts/subscriptions`. `PushRegistrar` keeps what the server holds in step with what
+  the phone has, and a subscription the server no longer lists is registered again on the next start.
+- `MailVerdictPushService` (`:app`, `push/`) receives the distributor's calls in a process that may
+  have been started just for them, and `PushNotifier` turns the decrypted payload
+  (`{title, body, url, tag}`) into a notification on the mail or system channel. A tap opens the
+  message through the same place resolver the mail list uses, or the alert list for an alert that
+  names none.
+- Signing out unregisters from the distributor and forgets the subscription; the server removes
+  the endpoint when it next fails to deliver to it.
+
+To see it work end to end, run a devstack with an `ENCRYPTION_KEY` set (the server cannot send push
+without one), an ntfy server reachable from both the host and the device (`adb reverse
+tcp:<port> tcp:<port>`), the ntfy app as the distributor with that address as its default server,
+and send a test notification from the notification settings screen.
+
 ## Fixture mode
 
 A debug build started with the launch flag serves canned data from `:kit`'s `Fixtures` instead of

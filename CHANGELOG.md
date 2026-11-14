@@ -40,3 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   and the message marked read on opening.
 - The newest page of each list visited and every conversation opened are kept on the device and
   shown when the server cannot be reached; signing out removes them.
+- Search: text search narrowed by field (subject, from, to, body) and by time window, and search by
+  meaning with a "Less likely matches" divider between the two tiers. A server that cannot search by
+  meaning gets the text results with a note saying so. Typing is debounced, and results are
+  keyed by message so a new query starts at the top.
+- Alerts: the list of new-mail alerts and of everything else the server raises, each dismissable one
+  by one or all at once, and a bell on the overview with the server's own count.
+- Notifications through UnifiedPush, with no Google services: the helper app the person already
+  uses delivers the server's Web Push, a tap opens the message in its list, and the notification
+  settings screen explains the helper app, turns notifications on and off, mutes the mail or system
+  channel, and sends a test notification.
