@@ -15,6 +15,7 @@ import com.frederikberg.mailverdict.kit.live.LiveInvalidation
 import com.frederikberg.mailverdict.kit.net.ApiError
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -80,10 +81,11 @@ class MailListActionsTest {
 
     private fun MailListStore.ids() = state.value.rows.map { it.id }
 
+    /** Undispatched: subscribed before this returns, so a notice emitted next is not missed (the flow keeps none for latecomers). */
     private fun <T> CoroutineScope.collecting(
         flow: Flow<T>,
         block: (T) -> Unit,
-    ) = launch { flow.collect { block(it) } }
+    ) = launch(start = CoroutineStart.UNDISPATCHED) { flow.collect { block(it) } }
 
     @Test
     fun anArchivedRowLeavesAtOnceEvenWhileTheRequestIsStillOut() =
