@@ -85,7 +85,7 @@ class MailListStore(
     private var lastRefreshFailure: Throwable? = null
     private val pageLock = Mutex()
 
-    /** Rows turn into what [MailListState.rows] holds through this; MA4's optimistic actions apply here. */
+    /** Rows turn into what [MailListState.rows] holds through this; optimistic actions apply here. */
     @Volatile
     var projection: (List<MessageSummary>) -> List<MessageSummary> = { it }
 
