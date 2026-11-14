@@ -16,7 +16,6 @@ class AuthStateTest {
         val modes =
             listOf(
                 AuthMode.None,
-                AuthMode.Bearer("pasted"),
                 AuthMode.Oidc(OidcTokens("a", "r", 1_700_000_000_000, "https://i", "c")),
                 AuthMode.Oidc(OidcTokens("a", null, null, "https://i", "c")),
             )

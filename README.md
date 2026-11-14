@@ -44,8 +44,7 @@ Chrome Custom Tab, and the session is sealed with a key that never leaves the ph
 
 ## What you need
 
-A running MailVerdict server (see its README) that offers sign-in to apps, or an access token for
-it. Android 8.0 or newer. For notifications, a UnifiedPush distributor app on the phone, such as
+A running MailVerdict server (see its README) that offers sign-in to apps. Android 8.0 or newer. For notifications, a UnifiedPush distributor app on the phone, such as
 [ntfy](https://ntfy.sh) or Sunup: the app registers with it, and the server's own Web Push messages
 reach the phone through it.
 
@@ -55,8 +54,8 @@ Download the APK of the latest [release](https://github.com/frederikberg/mail-ve
 and open it, or add the repository to [Obtainium](https://obtainium.imranr.dev/) to get updates.
 Updates install over an existing copy because every release is signed with the same key.
 
-Open the app, type the address of your server and sign in. Under *Advanced* a pasted access token
-works when the server offers no sign-in of its own.
+Open the app, type the address of your server and sign in. Signing out also revokes the sign-in at the
+identity provider, and the server lists the phone by its device name, so it can sign that one phone out.
 
 ## Building
 

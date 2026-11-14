@@ -41,7 +41,7 @@ class MailboxesStoreTest {
     }
 
     private fun api(client: OkHttpClient = OkHttpClient()) =
-        ApiClient(RequestFactory(server.baseUrl) { AuthMode.None }, client)
+        ApiClient(RequestFactory(server.baseUrl, "Test phone") { AuthMode.None }, client)
 
     private fun store(
         collapse: CollapseStore = InMemoryCollapseStore(),

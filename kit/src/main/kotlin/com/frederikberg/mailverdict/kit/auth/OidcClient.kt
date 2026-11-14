@@ -53,6 +53,8 @@ data class OidcProviderMetadata(
     val issuer: String,
     @SerialName("authorization_endpoint") val authorizationEndpoint: String,
     @SerialName("token_endpoint") val tokenEndpoint: String,
+    /** Absent when the provider cannot revoke tokens; signing out then only forgets them on the phone. */
+    @SerialName("revocation_endpoint") val revocationEndpoint: String? = null,
 )
 
 /**
@@ -92,14 +94,21 @@ class OidcClient(
         // itself, would send the credential somewhere the server never vouched for.
         val authorization = metadata.authorizationEndpoint.toHttpUrlOrNull()
         val token = metadata.tokenEndpoint.toHttpUrlOrNull()
+        val revocation = metadata.revocationEndpoint?.let { it.toHttpUrlOrNull() ?: throw mismatch() }
         if (metadata.issuer.trimEnd('/') != base ||
             authorization?.scheme != issuerUrl.scheme ||
-            token?.scheme != issuerUrl.scheme
+            token?.scheme != issuerUrl.scheme ||
+            (revocation != null && revocation.scheme != issuerUrl.scheme)
         ) {
-            throw OidcError.DiscoveryFailed("The sign-in provider's configuration does not match its address.")
+            throw mismatch()
         }
         return metadata
     }
+
+    private fun mismatch() =
+        OidcError.DiscoveryFailed(
+            "The sign-in provider's configuration does not match its address.",
+        )
 
     /** The URL the browser opens. [state] and [pkce] are the caller's, kept for [parseCallback] and [exchangeCode]. */
     fun authorizationUrl(
@@ -187,6 +196,35 @@ class OidcClient(
                 ),
             )
         return tokensFrom(response, tokens.issuer, tokens.clientId, previousRefreshToken = refreshToken)
+    }
+
+    /**
+     * Asks the provider to end this sign-in (RFC 7009): its refresh token stops working, and the access
+     * tokens issued from it with it. Does nothing when the provider names no revocation endpoint. A
+     * provider answers 200 whether or not it knew the token, so any other answer is an outage.
+     */
+    suspend fun revoke(
+        tokens: OidcTokens,
+        metadata: OidcProviderMetadata,
+    ) {
+        val endpoint = metadata.revocationEndpoint ?: return
+        val (token, hint) =
+            tokens.refreshToken?.let { it to "refresh_token" } ?: (tokens.accessToken to "access_token")
+        val request =
+            Request
+                .Builder()
+                .url(endpoint)
+                .post(
+                    formEncoded(
+                        listOf("token" to token, "token_type_hint" to hint, "client_id" to tokens.clientId),
+                    ).toRequestBody("application/x-www-form-urlencoded".toMediaType()),
+                ).build()
+        val response = send(request)
+        if (response.code !in
+            200..299
+        ) {
+            throw OidcError.Unavailable("The sign-in provider answered HTTP ${response.code}.")
+        }
     }
 
     @Serializable

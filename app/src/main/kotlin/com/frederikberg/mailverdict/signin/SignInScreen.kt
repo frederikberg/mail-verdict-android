@@ -15,7 +15,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -26,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.frederikberg.mailverdict.R
 import com.frederikberg.mailverdict.kit.session.Rejection
@@ -36,17 +34,13 @@ import com.frederikberg.mailverdict.kit.session.SignInStatus
 object SignInTags {
     const val SERVER = "signin-server"
     const val SIGN_IN = "signin-oidc"
-    const val ADVANCED = "signin-advanced"
-    const val TOKEN = "signin-token"
-    const val TOKEN_SIGN_IN = "signin-token-button"
     const val STATUS = "signin-status"
+    const val REJECTION = "signin-rejection"
 }
 
 /** What the sign-in screen draws; the route that owns the typing and the browser holds the rest. */
 data class SignInUiState(
     val serverUrl: String,
-    val token: String,
-    val advancedShown: Boolean,
     val status: SignInStatus,
     /** Set when a stored credential was refused, so the screen can say that instead of reading as a first launch. */
     val rejection: Rejection? = null,
@@ -61,12 +55,8 @@ data class SignInUiState(
 fun SignInScreen(
     state: SignInUiState,
     onServerUrl: (String) -> Unit,
-    onToken: (String) -> Unit,
     onSignIn: () -> Unit,
     onCancel: () -> Unit,
-    onToggleAdvanced: () -> Unit,
-    onPasteToken: () -> Unit,
-    onSignInWithToken: () -> Unit,
 ) {
     Scaffold { padding ->
         Column(
@@ -83,12 +73,15 @@ fun SignInScreen(
 
             if (state.rejection != null) {
                 Column {
+                    val message =
+                        if (state.rejection.deviceRevoked) R.string.signin_device_revoked else R.string.signin_rejected
                     Text(
-                        stringResource(R.string.signin_rejected),
+                        stringResource(message),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.testTag(SignInTags.REJECTION),
                     )
-                    state.rejection.detail?.takeIf { it.isNotBlank() }?.let {
+                    state.rejection.detail?.takeIf { it.isNotBlank() && !state.rejection.deviceRevoked }?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -121,39 +114,6 @@ fun SignInScreen(
             }
             Status(state, onCancel)
             Text(stringResource(R.string.signin_footer), style = MaterialTheme.typography.bodySmall)
-
-            TextButton(onClick = onToggleAdvanced, modifier = Modifier.testTag(SignInTags.ADVANCED)) {
-                Text(
-                    stringResource(
-                        if (state.advancedShown) R.string.signin_advanced_hide else R.string.signin_advanced_show,
-                    ),
-                )
-            }
-            if (state.advancedShown) {
-                OutlinedTextField(
-                    value = state.token,
-                    onValueChange = onToken,
-                    label = { Text(stringResource(R.string.signin_token_label)) },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    enabled = !state.busy,
-                    modifier = Modifier.fillMaxWidth().testTag(SignInTags.TOKEN),
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = onPasteToken, enabled = !state.busy) {
-                        Text(stringResource(R.string.signin_token_paste))
-                    }
-                    Button(
-                        onClick = onSignInWithToken,
-                        enabled = state.serverUrl.isNotBlank() && state.token.isNotBlank() && !state.busy,
-                        modifier = Modifier.testTag(SignInTags.TOKEN_SIGN_IN),
-                    ) {
-                        Text(stringResource(R.string.signin_token_button))
-                    }
-                }
-                Text(stringResource(R.string.signin_token_note), style = MaterialTheme.typography.bodySmall)
-            }
             if (state.fixtureMode) {
                 Text(stringResource(R.string.fixture_mode_label), style = MaterialTheme.typography.labelSmall)
             }

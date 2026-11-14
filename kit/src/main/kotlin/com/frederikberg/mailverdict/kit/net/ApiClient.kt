@@ -112,9 +112,7 @@ class ApiClient(
         refresher.refreshIfNeeded()
         val first = once()
         val refused = first.response.code.let { it == 401 || it == 403 }
-        if (!refused ||
-            !ApiError.from(first.response.code, first.response.body).isAuthenticationFailure
-        ) {
+        if (!refused || !ApiError.from(first.response.code, first.response.body).canBeRenewed) {
             return first.response
         }
 

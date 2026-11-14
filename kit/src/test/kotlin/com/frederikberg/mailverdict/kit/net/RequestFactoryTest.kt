@@ -17,7 +17,7 @@ class RequestFactoryTest {
     private fun factory(
         base: String = "https://mail.example.com",
         mode: () -> AuthMode = { AuthMode.None },
-    ) = RequestFactory(base, mode)
+    ) = RequestFactory(base, "Test phone", mode)
 
     @Test
     fun aNonHttpSchemeIsRefused() {
@@ -61,13 +61,13 @@ class RequestFactoryTest {
         val factory = factory(mode = { mode })
         assertNull(factory.build("/health").header("Authorization"))
 
-        mode = AuthMode.Bearer("jwt-value")
+        mode = OidcFixtures.mode("jwt-value")
         assertEquals("Bearer jwt-value", factory.build("/health").header("Authorization"))
     }
 
     @Test
-    fun anEmptyBearerSendsNoAuthorizationHeader() {
-        assertNull(factory(mode = { AuthMode.Bearer("") }).build("/health").header("Authorization"))
+    fun anEmptyAccessTokenSendsNoAuthorizationHeader() {
+        assertNull(factory(mode = { OidcFixtures.mode("") }).build("/health").header("Authorization"))
     }
 
     @Test
@@ -102,5 +102,33 @@ class RequestFactoryTest {
         assertEquals("application/json", withBody.body?.contentType()?.toString())
         val empty = factory().build("/alerts/dismiss-all", "POST")
         assertEquals(0L, empty.body?.contentLength())
+    }
+
+    @Test
+    fun theDeviceNameGoesOutOnEveryRequestWhateverTheCredential() {
+        val signedOut = RequestFactory("https://mail.example.com", "Pixel 8") { AuthMode.None }
+        val signedIn = RequestFactory("https://mail.example.com", "Pixel 8") { OidcFixtures.mode("a") }
+
+        assertEquals("Pixel 8", signedOut.build("/health").header("X-Device-Name"))
+        assertEquals("Pixel 8", signedIn.build("/health", "POST").header("X-Device-Name"))
+    }
+
+    /** The server reads the header as UTF-8, so a name with accents or an apostrophe must not make the request fail to build. */
+    @Test
+    fun aNameWithNonAsciiCharactersStillBuilds() {
+        val request =
+            RequestFactory(
+                "https://mail.example.com",
+                "Frédériks Telefon ✓",
+            ) { AuthMode.None }.build("/health")
+
+        assertEquals("Frédériks Telefon ✓", request.headers.values("X-Device-Name").single())
+    }
+
+    @Test
+    fun theDeviceNameIsCutToWhatTheServerAccepts() {
+        val request = RequestFactory("https://mail.example.com", "x".repeat(200)) { AuthMode.None }.build("/health")
+
+        assertEquals(64, request.header("X-Device-Name")?.length)
     }
 }

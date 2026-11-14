@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Every request names the phone in an `X-Device-Name` header (the name set in the phone's settings,
+  else manufacturer and model), so the server's list of signed-in devices can show it.
+- Signing out also asks the identity provider to revoke the sign-in, so the stored refresh token is
+  not good anywhere afterwards. The request is best effort and never delays the sign-out.
+- A device the server has removed from its list is signed out with its own message, without a token
+  renewal first.
+
+### Removed
+
+- Signing in with a pasted access token. A copy of the app that still holds one signs out on its next
+  start.
+
 ### Changed
 
 - The vendored API contract is synced to MailVerdict 8.0.0, and folders carry whether mail arriving in

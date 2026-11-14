@@ -135,7 +135,7 @@ class LiveEventHubTest {
             LiveEventHub(backgroundScope, nowMs = { currentTime }) { callbacks ->
                 SseClient(
                     scope = backgroundScope as CoroutineScope,
-                    requests = RequestFactory("https://mail.example.com") { AuthMode.None },
+                    requests = RequestFactory("https://mail.example.com", "Test phone") { AuthMode.None },
                     transport = transport,
                     callbacks = callbacks,
                     timing = timing,

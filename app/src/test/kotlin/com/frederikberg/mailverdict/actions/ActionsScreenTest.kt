@@ -65,7 +65,7 @@ class ActionsScreenTest {
     private val release = java.util.concurrent.CountDownLatch(1)
     private val api =
         ApiClient(
-            RequestFactory("https://fixture.invalid") { AuthMode.None },
+            RequestFactory("https://fixture.invalid", "Test phone") { AuthMode.None },
             OkHttpClient
                 .Builder()
                 .addInterceptor { chain ->

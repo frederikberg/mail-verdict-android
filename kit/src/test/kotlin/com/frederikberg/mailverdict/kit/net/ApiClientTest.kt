@@ -7,7 +7,6 @@ import com.frederikberg.mailverdict.kit.TestServer
 import com.frederikberg.mailverdict.kit.api.getHealth
 import com.frederikberg.mailverdict.kit.api.getMe
 import com.frederikberg.mailverdict.kit.api.performAction
-import com.frederikberg.mailverdict.kit.auth.AuthMode
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
 import okhttp3.OkHttpClient
@@ -28,7 +27,7 @@ class ApiClientTest {
     private fun client(
         base: String = server.baseUrl,
         retry: ReadRetryPolicy = ReadRetryPolicy(delaysMs = listOf(1, 1)),
-    ) = ApiClient(RequestFactory(base) { AuthMode.Bearer("t") }, OkHttpClient(), readRetry = retry)
+    ) = ApiClient(RequestFactory(base, "Test phone") { OidcFixtures.mode("t") }, OkHttpClient(), readRetry = retry)
 
     private fun <T> failure(block: suspend () -> T): ApiError =
         assertThrows(ApiError::class.java) {
