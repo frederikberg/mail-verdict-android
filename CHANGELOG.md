@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Signing out revokes the phone's own row in the server's list of sign-ins and deletes its push
+  subscription before the credential is dropped, best effort and without delaying the sign-out. The
+  vendored API contract is synced to MailVerdict 9.0.1.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

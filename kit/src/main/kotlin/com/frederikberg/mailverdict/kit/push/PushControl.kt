@@ -2,8 +2,10 @@ package com.frederikberg.mailverdict.kit.push
 
 import com.frederikberg.mailverdict.contract.PushChannel
 import com.frederikberg.mailverdict.contract.PushSubscriptionUpdate
+import com.frederikberg.mailverdict.kit.api.deletePushSubscription
 import com.frederikberg.mailverdict.kit.api.sendTestPush
 import com.frederikberg.mailverdict.kit.api.updatePushSubscription
+import com.frederikberg.mailverdict.kit.net.ApiClient
 import com.frederikberg.mailverdict.kit.net.ApiError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +50,12 @@ interface PushControl {
 
     suspend fun disable()
 
+    /**
+     * What removes this phone's subscription from the server, to run while the sign-in still works. The
+     * subscription's id is captured now, so it can run after [onSignedOut] has made the phone forget it.
+     */
+    fun ownSubscriptionRemoval(): suspend (ApiClient) -> Unit
+
     /** Sign-out: nothing can be told to the server any more; the phone stops listening and forgets. */
     fun onSignedOut()
 
@@ -70,6 +78,19 @@ abstract class SubscriptionPushControl(
 
     protected val mutableNotice = MutableStateFlow<String?>(null)
     override val notice: StateFlow<String?> = mutableNotice.asStateFlow()
+
+    override fun ownSubscriptionRemoval(): suspend (ApiClient) -> Unit {
+        val id = subscriptionId ?: return {}
+        return { api ->
+            try {
+                api.deletePushSubscription(id)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: ApiError) {
+                // The server drops a subscription it can no longer reach.
+            }
+        }
+    }
 
     override suspend fun setMuted(
         channel: PushChannel,

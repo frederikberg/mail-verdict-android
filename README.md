@@ -64,8 +64,9 @@ Download the APK of the latest [release](https://github.com/frederikberg/mail-ve
 and open it, or add the repository to [Obtainium](https://obtainium.imranr.dev/) to get updates.
 Updates install over an existing copy because every release is signed with the same key.
 
-Open the app, type the address of your server and sign in. Signing out also revokes the sign-in at the
-identity provider, and the server lists the phone by its device name, so it can sign that one phone out.
+Open the app, type the address of your server and sign in. Signing out also removes the phone's sign-in
+and notification subscription on the server and revokes the sign-in at the identity provider. The server
+lists the phone by its device name, so a single phone can also be signed out from there.
 
 ## Building
 

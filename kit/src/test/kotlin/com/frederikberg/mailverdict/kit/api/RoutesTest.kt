@@ -153,6 +153,8 @@ class RoutesTest {
             )
         }
         call { api.lookupAlerts(listOf(id)) }
+        call { api.listOwnSignIns() }
+        call { api.revokeOwnSignIn(id) }
         call { api.deletePushSubscription(id) }
         call { api.sendTestPush(id) }
         call { api.createOutbox(OutboxCreateRequest(accountId = id, kind = "send", to = listOf("a@example.com"))) }

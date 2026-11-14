@@ -61,10 +61,14 @@ the only place that decides between the signed-out and signed-in screens.
   kept in `AppPreferences` next to the theme and which overview sections are collapsed.
 - **Ending the session.** A credential the server refuses for good (after the renewal in
   *Authentication and live updates*) or a disabled user clears the stored credential and shows the
-  sign-in screen with a notice; signing out does the same without one, and also asks the provider to
-  revoke the sign-in (the `revocation_endpoint` of its discovery document, RFC 7009), best effort and
-  bounded, so the stored refresh token stops working. A `device_revoked` notice says the device was
-  signed out.
+  sign-in screen with a notice; signing out does the same without one and then, best effort and
+  bounded (`SessionController.releaseDevice`, `revokeAtProvider`), cleans up with the credential still
+  in memory: the phone's push subscription is deleted (`PushControl.ownSubscriptionRemoval`), its own
+  row in `GET /api/me/sign-ins` (the one marked `current`) is revoked with
+  `POST /api/me/sign-ins/{id}/revoke`, and the provider is asked to revoke the sign-in (the
+  `revocation_endpoint` of its discovery document, RFC 7009) so the stored refresh token stops working.
+  Offline, the phone still signs out at once and the rows are left for the server's list. A
+  `device_revoked` notice says the device was signed out.
 
 The Robolectric tests cover the screens and the redirect plumbing; the real Keystore and the Custom
 Tab need a device or emulator. A stand-in server for the emulator only needs `GET /api/auth/config`,
@@ -167,8 +171,8 @@ standard Web Push to it:
   (`{title, body, url, tag}`) into a notification on the mail or system channel. A tap opens the
   message through the same place resolver the mail list uses, or the alert list for an alert that
   names none.
-- Signing out unregisters from the distributor and forgets the subscription; the server removes
-  the endpoint when it next fails to deliver to it.
+- Signing out unregisters from the distributor, forgets the subscription and deletes it on the server
+  while the sign-in still works.
 
 To see the helper-app path work end to end, run a devstack with an `ENCRYPTION_KEY` set (the server
 cannot send push without one), an ntfy server reachable from both the host and the device (`adb reverse
