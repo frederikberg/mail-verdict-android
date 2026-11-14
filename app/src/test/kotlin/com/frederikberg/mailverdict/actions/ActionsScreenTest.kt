@@ -105,6 +105,7 @@ class ActionsScreenTest {
         compose.setContent {
             MailVerdictTheme(dynamicColor = false) {
                 val current by store.state.collectAsState()
+                val queueState by queue.state.collectAsState()
                 val listState = rememberMailListState(current.identity, current.rows, null)
                 MailListScreen(
                     title = "Inbox",
@@ -141,7 +142,7 @@ class ActionsScreenTest {
                     actions =
                         ListActions(
                             notices = notices,
-                            attention = queue.state.value.summary,
+                            attention = queueState.summary,
                             swipeEnd = { MessageActionSet.swipeEnd(store.actionContext(setOf(it.id))) },
                             swipeStart = { MessageActionSet.swipeStart(store.actionContext(setOf(it.id))) },
                             onSwipe = onSwipe,
