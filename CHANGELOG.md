@@ -30,3 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Navigation, the mailbox overview (unified views, then each account's folders in lead order with
   unread counts, collapsible, refreshed live), an offline capsule, and settings with theme, the
   signed-in user and sign-out.
+- The message list for a folder or a unified view: grouped by conversation or flat, an unread
+  filter, pull to refresh, live updates, selection by long press, and pages loaded two screens before
+  the end. Rows have one fixed height, the place of the row at the top survives rows arriving
+  above it, and a different list starts at the top.
+- The reader: a conversation newest first with the opened message expanded, HTML bodies in a web
+  view with script off and remote images hidden until asked for (inline images are fetched with the
+  app's own credential), plain-text bodies drawn natively, attachments opened through the system,
+  and the message marked read on opening.
+- The newest page of each list visited and every conversation opened are kept on the device and
+  shown when the server cannot be reached; signing out removes them.

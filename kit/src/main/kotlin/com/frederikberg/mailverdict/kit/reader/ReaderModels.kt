@@ -11,8 +11,10 @@ sealed interface ReaderBody {
         val html: String,
     ) : ReaderBody
 
+    /** [body] is the bounded start of [raw], what is drawn until the person asks for the rest. */
     data class Text(
         val body: PlainBody,
+        val raw: String,
     ) : ReaderBody
 
     data object Empty : ReaderBody
@@ -89,7 +91,7 @@ object ReaderMessages {
         val body =
             when {
                 html != null -> ReaderBody.Html(html)
-                text != null -> ReaderBody.Text(PlainText.prepare(text))
+                text != null -> ReaderBody.Text(PlainText.prepare(text), text)
                 else -> ReaderBody.Empty
             }
         val to =

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="maillist_unread_filter">Show only unread</string>
+    <string name="maillist_threaded">Group by conversation</string>
+    <string name="maillist_loading">Loading messages…</string>
+    <string name="maillist_retry">Try again</string>
+    <string name="maillist_load_failed">Could not load messages: %1$s</string>
+    <string name="maillist_new_messages">%1$d new</string>
+    <string name="maillist_unread_subtitle">Unread</string>
+    <string name="maillist_selected">%1$d selected</string>
+    <string name="maillist_select_loaded">Select loaded</string>
+    <string name="maillist_stop_selecting">Done</string>
+    <string name="maillist_more">More</string>
+    <string name="maillist_attachment">Has an attachment</string>
+    <string name="maillist_flagged">Flagged</string>
+    <string name="maillist_spam">Marked as spam</string>
+    <string name="maillist_unread">Unread</string>
+
+    <string name="reader_loading">Loading…</string>
+    <string name="reader_failed">Could not open this message: %1$s</string>
+    <string name="reader_retry">Try again</string>
+    <string name="reader_show_images">Show images</string>
+    <string name="reader_images_blocked">Remote images are hidden.</string>
+    <string name="reader_show_all">Show entire message</string>
+    <string name="reader_truncated">The rest of this long message is not shown.</string>
+    <string name="reader_empty_body">No content available</string>
+    <string name="reader_glacier">Kept in the glacier, no longer on the mail server.</string>
+    <string name="reader_glacier_from">Kept in the glacier. It was in %1$s.</string>
+    <string name="reader_spam">Marked as spam</string>
+    <string name="reader_draft">Draft</string>
+    <string name="reader_cc">Cc: %1$s</string>
+    <string name="reader_expand">Expand</string>
+    <string name="reader_collapse">Collapse</string>
+    <string name="reader_no_app_for_attachment">No app can open this file.</string>
+    <string name="reader_attachment_failed">Could not download the attachment: %1$s</string>
+    <string name="reader_no_subject">(no subject)</string>
+</resources>

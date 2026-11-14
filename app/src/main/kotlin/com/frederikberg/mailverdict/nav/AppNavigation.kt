@@ -1,31 +1,18 @@
 package com.frederikberg.mailverdict.nav
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.frederikberg.mailverdict.AppGraph
-import com.frederikberg.mailverdict.R
 import com.frederikberg.mailverdict.kit.session.Connection
 import com.frederikberg.mailverdict.mailboxes.MailboxesRoute
+import com.frederikberg.mailverdict.maillist.MailListRoute
+import com.frederikberg.mailverdict.maillist.toListScope
+import com.frederikberg.mailverdict.reader.ReaderRoute
 import com.frederikberg.mailverdict.settings.SettingsScreen
 import kotlinx.serialization.Serializable
 
@@ -44,6 +31,16 @@ sealed interface Route {
         val accountId: String? = null,
         val folderId: String? = null,
         val unifiedViewId: String? = null,
+        val unifiedName: String? = null,
+        /** Opens the window around this message instead of at the newest edge. */
+        val aroundMessageId: String? = null,
+    ) : Route
+
+    /** One conversation, opened on the message [messageId]; [folderIds] are the folders its list shows. */
+    @Serializable
+    data class Reader(
+        val messageId: String,
+        val folderIds: List<String> = emptyList(),
     ) : Route
 }
 
@@ -63,7 +60,9 @@ fun AppNavigation(
                 onOpenFolder = {
                     navController.navigate(Route.MailList(it.displayName, it.accountId, folderId = it.id))
                 },
-                onOpenUnified = { navController.navigate(Route.MailList(it.name, unifiedViewId = it.id)) },
+                onOpenUnified = {
+                    navController.navigate(Route.MailList(it.name, unifiedViewId = it.id, unifiedName = it.name))
+                },
                 onOpenSettings = { navController.navigate(Route.Settings) },
             )
         }
@@ -81,32 +80,26 @@ fun AppNavigation(
             )
         }
         composable<Route.MailList> { entry ->
-            MailListPlaceholder(entry.toRoute<Route.MailList>().title) { navController.popBackStack() }
-        }
-    }
-}
-
-/** Stands where the message list goes; a folder or unified view opens here until that screen exists. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MailListPlaceholder(
-    title: String,
-    onBack: () -> Unit,
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(title) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
+            val route = entry.toRoute<Route.MailList>()
+            MailListRoute(
+                graph = graph,
+                connection = connection,
+                scope = route.toListScope(),
+                title = route.title,
+                aroundMessageId = route.aroundMessageId,
+                onBack = { navController.popBackStack() },
+                onOpenMessage = { row, folders -> navController.navigate(Route.Reader(row.id, folders.toList())) },
             )
-        },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding).padding(24.dp), contentAlignment = Alignment.Center) {
-            Text(stringResource(R.string.maillist_placeholder))
+        }
+        composable<Route.Reader> { entry ->
+            val route = entry.toRoute<Route.Reader>()
+            ReaderRoute(
+                graph,
+                connection,
+                route.messageId,
+                route.folderIds.toSet(),
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }

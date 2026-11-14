@@ -158,7 +158,7 @@ class MailListStore(
                     base = page.messages
                     hasOlder = page.hasMore
                     hasNewer = page.hasMoreNewer
-                    identity = ListIdentity(scope, threaded, unreadOnly, expected)
+                    install(ListIdentity(scope, threaded, unreadOnly, expected))
                     phase = ListPhase.Loaded
                     savedCopyAtMs = null
                     rebuildRows()
@@ -218,7 +218,7 @@ class MailListStore(
             base = saved.rows
             hasOlder = saved.hasOlder
             hasNewer = false
-            identity = ListIdentity(scope, threaded, unreadOnly, expected)
+            install(ListIdentity(scope, threaded, unreadOnly, expected))
             phase = ListPhase.Loaded
             savedCopyAtMs = saved.savedAtMs
             rebuildRows()
@@ -255,8 +255,10 @@ class MailListStore(
 
     suspend fun loadNewer() = page(older = false)
 
+    /** One page read at a time: a request arriving while one is in flight is dropped, and asked again once the rows grew and the reader is still near the edge. */
     private suspend fun page(older: Boolean) {
-        pageLock.withLock {
+        if (!pageLock.tryLock()) return
+        try {
             val window =
                 synchronized(lock) {
                     val ok = if (older) hasOlder else hasNewer
@@ -296,6 +298,8 @@ class MailListStore(
                 }
                 publish()
             }
+        } finally {
+            pageLock.unlock()
         }
     }
 
@@ -714,6 +718,12 @@ class MailListStore(
     }
 
     // Derivation
+
+    /** A different list starts at the top, so the place remembered in the one it replaces is dropped. Must be called with [lock] held. */
+    private fun install(next: ListIdentity) {
+        if (next != identity) savedViewport = null
+        identity = next
+    }
 
     /** Must be called with [lock] held. */
     private fun rebuildRows() {

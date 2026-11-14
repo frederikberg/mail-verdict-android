@@ -67,14 +67,20 @@ class MainActivityFlowTest {
     }
 
     @Test
-    fun aFolderOpensItsPlaceholderAndBackReturnsToTheOverview() {
-        launchFixture().use {
+    fun aFolderOpensItsMessagesTheReaderShowsOneAndBackRetracesTheSteps() {
+        launchFixture().use { scenario ->
             waitForText("Inboxes")
-            val state = (ApplicationProvider.getApplicationContext<MailVerdictApp>()).currentGraph()
-            check(state.fixtureMode)
+            check((ApplicationProvider.getApplicationContext<MailVerdictApp>()).currentGraph().fixtureMode)
 
             compose.onNodeWithText("Archive").performClick()
-            waitForText("The message list is not part of this build yet.")
+            waitForText("Quarterly planning")
+            compose.onNodeWithText("Ada Lovelace").performClick()
+            waitForText("First draft is in.")
+
+            scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+            waitForText("Quarterly planning")
+            scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+            waitForText("Inboxes")
         }
     }
 }

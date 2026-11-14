@@ -101,6 +101,7 @@ object ReaderDocument {
         return """
             html, body { margin: 0; padding: 0; }
             body {
+              padding: 0 16px;
               font: 16px/1.55 sans-serif;
               word-wrap: break-word;
               overflow-wrap: break-word;

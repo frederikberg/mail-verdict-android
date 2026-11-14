@@ -255,10 +255,11 @@ class MailListStoreTest {
             assertEquals(online.ids().take(100), offline.ids())
 
             backend.failure = null
-            backend.messages = listOf(message(121)) + backend.messages
+            // Much arrived since the page was saved: the saved rows are replaced, never kept under a gap.
+            backend.messages = rows(300 downTo 1)
             offline.refresh()
             assertNull(offline.state.value.savedCopyAtMs)
-            assertEquals(id(121), offline.ids().first())
+            assertEquals(rows(300 downTo 201).map { it.id }, offline.ids())
         }
 
     @Test
@@ -395,10 +396,16 @@ class MailListStoreTest {
         }
 
     @Test
-    fun theViewportIsRememberedByIdentityAcrossAVisit() {
-        val store = store(FakeMailListBackend(emptyList()))
-        assertNull(store.savedViewport)
-        store.saveViewport(ViewportAnchor(id(7), 12))
-        assertEquals(ViewportAnchor(id(7), 12), store.savedViewport)
-    }
+    fun theViewportIsRememberedAcrossAVisitAndForgottenWhenTheListBecomesAnother() =
+        eventually {
+            val backend = FakeMailListBackend(rows(80 downTo 1))
+            val store = store(backend)
+            store.start()
+            assertNull(store.savedViewport)
+            store.saveViewport(ViewportAnchor(id(7), 12))
+            store.refresh()
+            assertEquals("a refresh is the same list", ViewportAnchor(id(7), 12), store.savedViewport)
+            store.setUnreadOnly(true)
+            assertNull("a different list starts at the top", store.savedViewport)
+        }
 }

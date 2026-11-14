@@ -87,6 +87,25 @@ write their PNGs under `app/build/outputs/roborazzi/`, but only from the record 
 look at, not compared against a baseline. `tooling/screenshots.sh` re-records them and copies them
 to `docs/images/`.
 
+## The mail list and the reader
+
+The list's stores live in `:kit` (`maillist/`, `reader/`, `cache/`), its screens in `:app`
+(`maillist/`, `reader/`). What the list guarantees is tested on the real screen in
+`MailListScrollTest`: the row at the top of the viewport and its offset survive rows arriving or
+leaving above it, every row lays out at the one height it was given however long its text, a
+different list (another filter, grouping or jump to the newest mail) starts at the top, and a
+return from the reader restores the place by row identity. A reader resting at the very top of a
+list that starts at the newest message sees new mail arrive there; anyone further down is told how
+many rows landed above.
+
+A reader page loads under one rule (`ReaderRequestPolicy`): inline attachments of the server are
+fetched by the app with its credential, remote content is blocked until the person asks for
+images, and then only images pass. Page script is off.
+
+The offline cache keeps the newest page of each list visited and each conversation opened under
+the app's cache directory, one directory per server, and is emptied on sign-out. Fixture mode keeps
+nothing.
+
 ## Fixture mode
 
 A debug build started with the launch flag serves canned data from `:kit`'s `Fixtures` instead of
