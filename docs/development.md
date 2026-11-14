@@ -230,6 +230,23 @@ signed with the keystore held in the repository's Actions secrets, verifies the 
 version inside the APK, and publishes a GitHub Release whose notes are the changelog section. A tag
 containing `-` is marked as a pre-release.
 
+The same tag then delivers the build to the channels whose credentials the repository holds; a channel
+without its credential is skipped with a notice on the run, and the GitHub Release is published before
+any of them, so a Firebase or Play outage never holds back the APK:
+
+| Channel | Needs | Delivers |
+|---|---|---|
+| GitHub Release | nothing beyond the keystore | the signed APK, for Obtainium and direct installs |
+| Firebase configuration | secret `GOOGLE_SERVICES_JSON` | `app/google-services.json` is written for the build, so it has Google push; without it the build has the helper-app path only |
+| Firebase App Distribution | secret `FIREBASE_SERVICE_ACCOUNT_JSON` (a service account with the *Firebase App Distribution Admin* role), variable `FIREBASE_TESTER_GROUPS` (group aliases, comma-separated) | the APK to those testers, with the release notes |
+| Google Play internal testing | secret `PLAY_SERVICE_ACCOUNT_JSON` (a Play Developer API service account with release rights), optional variable `PLAY_RELEASE_STATUS` | the app bundle to the internal track |
+
+The release keystore is the Play *upload* key: Play App Signing holds the key users' devices see, and
+the bundle is signed with the upload key only. The first bundle of a new Play app is uploaded by hand
+in the Play Console before the API can see the app, and until the app has been published once its
+releases are drafts (`PLAY_RELEASE_STATUS=draft`). What's-new text is the changelog section as plain
+bullets cut to Play's 500 characters (`tooling/play_release_notes.sh`).
+
 A release build needs `RELEASE_KEYSTORE_FILE` (a path) and `RELEASE_KEYSTORE_PASSWORD` in the
 environment and fails without them rather than producing an unsigned APK. The key alias is
 `release`. Debug builds sign with the SDK's debug key.

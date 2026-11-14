@@ -60,5 +60,17 @@
       ],
       "groupName": "compose"
     }
+  ],
+  "customManagers": [
+    {
+      "description": "Tool versions the release workflow pins, marked by a `# renovate:` comment",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)\\n\\s+[A-Z_]+: (?<currentValue>\\S+)"
+      ]
+    }
   ]
 }

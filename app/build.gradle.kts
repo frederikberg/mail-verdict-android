@@ -84,15 +84,17 @@ kotlin {
     jvmToolchain(21)
 }
 
-// An unsigned release APK installs nowhere, so a release build without the keystore fails instead of
-// producing one.
+// An unsigned release APK installs nowhere and Google Play refuses an unsigned bundle, so a release
+// build without the keystore fails instead of producing one.
 val requireReleaseSigning =
     tasks.register("requireReleaseSigning") {
         val present = releaseKeystoreFile.isPresent && releaseKeystorePassword.isPresent
         val message = "A release build needs RELEASE_KEYSTORE_FILE and RELEASE_KEYSTORE_PASSWORD in the environment."
         doLast { check(present) { message } }
     }
-tasks.matching { it.name == "packageRelease" }.configureEach { dependsOn(requireReleaseSigning) }
+tasks.matching { it.name == "packageRelease" || it.name == "bundleRelease" }.configureEach {
+    dependsOn(requireReleaseSigning)
+}
 
 dependencies {
     implementation(project(":kit"))

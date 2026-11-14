@@ -1,8 +1,17 @@
 name: Release
 
 # A tag `vX.Y.Z` publishes a GitHub Release carrying the signed APK, with the matching CHANGELOG.md
-# section as its notes. The tag goes on the merge commit of the release pull request, after its
-# `CI ok` is green.
+# section as its notes, and then delivers the build to the channels whose credentials exist:
+#
+#   secret GOOGLE_SERVICES_JSON            Firebase project configuration; without it the build has no
+#                                          Google push (the helper-app path only) and nothing below runs
+#   secret FIREBASE_SERVICE_ACCOUNT_JSON   Firebase App Distribution testers (role: Firebase App
+#   variable FIREBASE_TESTER_GROUPS        Distribution Admin); the groups are aliases, comma-separated
+#   secret PLAY_SERVICE_ACCOUNT_JSON       Google Play internal testing track, from the app bundle
+#   variable PLAY_RELEASE_STATUS           optional: `draft` until the app has been published once
+#
+# The release keystore is the Play upload key. The tag goes on the merge commit of the release pull
+# request, after its `CI ok` is green.
 on:
   push:
     tags: ['v*']
@@ -32,6 +41,11 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: write
+    env:
+      HAS_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
+      HAS_PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+      # renovate: datasource=npm depName=firebase-tools
+      FIREBASE_TOOLS_VERSION: 15.36.0
     steps:
       - uses: actions/checkout@v7
 
@@ -55,11 +69,24 @@ jobs:
           umask 077
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
 
-      - name: Build the signed APK
+      # A build without the Firebase configuration still releases; it just has no Google push.
+      - name: Install the Firebase configuration
+        id: firebase
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::warning::GOOGLE_SERVICES_JSON is not set: this build has no Google push, only the helper-app path"
+            exit 0
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" | tooling/google_services.sh install app/google-services.json
+          echo "app_id=$(tooling/google_services.sh app-id app/google-services.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Build the signed APK and app bundle
         env:
           RELEASE_KEYSTORE_FILE: ${{ runner.temp }}/release.keystore
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
-        run: ./gradlew --console=plain --no-configuration-cache :app:assembleRelease
+        run: ./gradlew --console=plain --no-configuration-cache :app:assembleRelease :app:bundleRelease
 
       - name: Check the APK
         run: |
@@ -70,8 +97,18 @@ jobs:
           grep -q "versionName='${GITHUB_REF_NAME#v}'" "$RUNNER_TEMP/badging.txt"
           mv "$apk" "mail-verdict-$GITHUB_REF_NAME.apk"
 
+      - name: Check the app bundle
+        run: |
+          bundle=app/build/outputs/bundle/release/app-release.aab
+          jarsigner -verify -certs "$bundle" | tee "$RUNNER_TEMP/bundle-signature.txt" | tail -1
+          grep -q 'jar verified' "$RUNNER_TEMP/bundle-signature.txt"
+          ! grep -q 'jar is unsigned' "$RUNNER_TEMP/bundle-signature.txt"
+
       - name: Cut the release notes from CHANGELOG.md
-        run: tooling/extract_changelog.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+        run: |
+          tooling/extract_changelog.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+          mkdir "$RUNNER_TEMP/whatsnew"
+          tooling/play_release_notes.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/whatsnew/whatsnew-en-US"
 
       - uses: softprops/action-gh-release@v3
         with:
@@ -79,6 +116,53 @@ jobs:
           body_path: ${{ runner.temp }}/notes.md
           prerelease: ${{ contains(github.ref_name, '-') }}
 
-      - name: Remove the keystore
+      # The GitHub release is out before either channel below runs, so a Firebase or Play outage never
+      # holds back the APK Obtainium users take.
+      - name: Deliver to Firebase App Distribution
+        if: env.HAS_FIREBASE_SERVICE_ACCOUNT == 'true'
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_APP_ID: ${{ steps.firebase.outputs.app_id }}
+          TESTER_GROUPS: ${{ vars.FIREBASE_TESTER_GROUPS }}
+        run: |
+          : "${FIREBASE_APP_ID:?FIREBASE_SERVICE_ACCOUNT_JSON is set but this build has no Firebase configuration}"
+          : "${TESTER_GROUPS:?FIREBASE_TESTER_GROUPS is not set}"
+          umask 077
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-service-account.json" \
+            npx --yes "firebase-tools@$FIREBASE_TOOLS_VERSION" appdistribution:distribute \
+            "mail-verdict-$GITHUB_REF_NAME.apk" \
+            --app "$FIREBASE_APP_ID" \
+            --groups "$TESTER_GROUPS" \
+            --release-notes-file "$RUNNER_TEMP/whatsnew/whatsnew-en-US"
+
+      - name: Firebase App Distribution is not set up
+        if: env.HAS_FIREBASE_SERVICE_ACCOUNT != 'true'
+        run: |
+          echo "::notice::FIREBASE_SERVICE_ACCOUNT_JSON is not set: the build was not delivered to Firebase App Distribution"
+
+      - name: Read the application id
+        id: app
+        run: echo "id=$(tooling/google_services.sh application-id)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to the Google Play internal track
+        if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ steps.app.outputs.id }}
+          releaseFiles: app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+          whatsNewDirectory: ${{ runner.temp }}/whatsnew
+
+      - name: Google Play is not set up
+        if: env.HAS_PLAY_SERVICE_ACCOUNT != 'true'
+        run: |
+          echo "::notice::PLAY_SERVICE_ACCOUNT_JSON is not set: the bundle was not published to Google Play"
+
+      - name: Remove the keystore and the credentials
         if: always()
-        run: find "$RUNNER_TEMP" -maxdepth 1 -name release.keystore -delete
+        run: |
+          find "$RUNNER_TEMP" -maxdepth 1 \( -name release.keystore -o -name firebase-service-account.json \) -delete
+          find app -maxdepth 1 -name google-services.json -delete
