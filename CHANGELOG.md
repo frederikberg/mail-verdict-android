@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - A device the server has removed from its list is signed out with its own message, without a token
   renewal first.
 
+- Notifications through Google's push service where Google Play services exist, over the push relay
+  the iPhone app uses and with the same sealed alerts: nothing to install. The helper-app path stays
+  for phones without Google services, and a phone that used it is moved over on the first start. A
+  build without the Firebase project configuration uses the helper-app path only.
+- Notifications of mail read elsewhere are withdrawn when the server says so.
+
 ### Removed
 
 - Signing in with a pasted access token. A copy of the app that still holds one signs out on its next

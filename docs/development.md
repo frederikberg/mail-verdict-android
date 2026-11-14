@@ -124,12 +124,42 @@ query supersedes, asks twice in semantic mode (the text list shows until the ans
 replaces it) and falls back to the text list when the server answers `503` to a semantic query.
 `SearchBackend` is the seam the store's timing tests run against in virtual time.
 
-Notifications use the UnifiedPush connector, so a distributor app (ntfy, Sunup) delivers them
-instead of Google's service. The server already sends Web Push to the subscriptions a signed-in user
-registers, so the app registers the distributor's endpoint and key set as one:
+Notifications reach the phone one of two ways, decided once at start by `PushBackendChoice`: through
+Google's push service when the build carries a Firebase configuration and Google Play services answer,
+through a UnifiedPush distributor otherwise. Both are a `PushControl` the screens read, so the settings
+screen and the alert list do not know which one they have. A phone moved from the helper-app path to
+Google's has its old subscription removed on the first start, and notifications stay on.
 
-- `PushController` (`:kit`, `push/`) is the state machine: it reads the server's VAPID key, asks the
-  distributor for an endpoint (`UnifiedPush.register` with the key), and posts the endpoint to
+Google's push service (`NativePushController`, `:kit`, `push/`) is the registration the iPhone app uses:
+
+- Turning notifications on takes the install's push token to the push relay (`PushRelayClient`,
+  `POST /v1/register` with the app name `mailverdict` and platform `fcm`), which answers with a sealed,
+  expiring ticket. The ticket and a 32-byte content key generated on the phone go to the server
+  (`POST /api/alerts/subscriptions/native`, under an installation id also generated here). The server
+  seals each alert with the key and posts it to the relay under the ticket; the relay forwards it as a
+  data-only message, so the app always builds the notification itself.
+- `PushEnvelope` opens the sealed blob (AES-256-GCM, the installation id bound as authenticated data);
+  `PushEnvelopeTest` opens the server's own test vector. The record holding the key and the token
+  (`NativePushRecord`) lives in a file sealed under the AndroidKeyStore, like the sign-in.
+- A registration is made again, without the person, when Google issues a new token
+  (`MailVerdictFcmService.onNewToken`), when the ticket has less than 30 days left, and when the server
+  no longer lists it. Only turning notifications off, or signing out, ends it; either drops the token.
+- A `background` push is the server asking the phone to withdraw notifications of alerts read
+  elsewhere: `staleAlertIds` asks `POST /api/alerts/lookup` which of the shown ones are gone or
+  dismissed, and `resolved` ids inside an alert withdraw theirs directly.
+- Google's service starts only when notifications are turned on (`firebase_messaging_auto_init_enabled`
+  is off in the manifest), so a phone that never does contacts nobody.
+
+The Firebase project configuration is not in the repository. A build that has `app/google-services.json`
+applies the Google services plugin and uses Google's push service where it can; one without compiles and
+runs with the helper-app path only, which is what contributors and pull-request checks build. The release
+workflow writes the file from the `GOOGLE_SERVICES_JSON` secret.
+
+The helper-app path (`PushController`) registers the distributor's Web Push endpoint, the server sends
+standard Web Push to it:
+
+- `PushController` is the state machine: it reads the server's VAPID key, asks the distributor for an
+  endpoint (`UnifiedPush.register` with the key), and posts the endpoint to
   `POST /api/alerts/subscriptions`. `PushRegistrar` keeps what the server holds in step with what
   the phone has, and a subscription the server no longer lists is registered again on the next start.
 - `MailVerdictPushService` (`:app`, `push/`) receives the distributor's calls in a process that may
@@ -140,10 +170,13 @@ registers, so the app registers the distributor's endpoint and key set as one:
 - Signing out unregisters from the distributor and forgets the subscription; the server removes
   the endpoint when it next fails to deliver to it.
 
-To see it work end to end, run a devstack with an `ENCRYPTION_KEY` set (the server cannot send push
-without one), an ntfy server reachable from both the host and the device (`adb reverse
+To see the helper-app path work end to end, run a devstack with an `ENCRYPTION_KEY` set (the server
+cannot send push without one), an ntfy server reachable from both the host and the device (`adb reverse
 tcp:<port> tcp:<port>`), the ntfy app as the distributor with that address as its default server,
-and send a test notification from the notification settings screen.
+and send a test notification from the notification settings screen. A debug build without
+`google-services.json` takes this path on any emulator, Google Play services or not. Seeing Google's path
+needs a build with the configuration, a device with Google Play services (a `google_apis` emulator image
+counts), and a server whose `push` config lists a relay that has a Firebase key.
 
 ## Fixture mode
 

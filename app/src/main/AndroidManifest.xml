@@ -50,6 +50,19 @@
             </intent-filter>
         </activity>
 
+        <!-- Google's push service starts only once a person turns notifications on; see FirebaseFcmPlatform. -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+
+        <service
+            android:name=".push.MailVerdictFcmService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <service
             android:name=".push.MailVerdictPushService"
             android:exported="false">

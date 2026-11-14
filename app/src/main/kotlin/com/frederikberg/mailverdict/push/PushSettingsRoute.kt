@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.frederikberg.mailverdict.AppGraph
+import com.frederikberg.mailverdict.kit.push.PushBackend
 import kotlinx.coroutines.launch
 import org.unifiedpush.android.connector.UnifiedPush
 
@@ -45,10 +46,10 @@ fun PushSettingsRoute(
 
     var enableAfterPermission by remember { mutableStateOf(false) }
 
-    // Picks the saved distributor, else the system default, which asks the person to choose when there are several.
+    // Google's push service needs no helper app; the helper-app path picks the saved distributor, else the system default, which asks the person to choose when there are several.
     fun chooseDistributorAndEnable() {
         val activity = context as? Activity
-        if (activity == null) {
+        if (activity == null || graph.pushBackend == PushBackend.Fcm) {
             scope.launch { graph.push.enable() }
         } else {
             UnifiedPush.tryUseCurrentOrDefaultDistributor(activity) { chosen ->
@@ -78,6 +79,7 @@ fun PushSettingsRoute(
     }
 
     PushSettingsScreen(
+        backend = graph.pushBackend,
         status = status,
         systemAllowed = systemAllowed,
         notice = notice,

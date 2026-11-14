@@ -21,6 +21,18 @@ val appVersionCode: Int =
 val releaseKeystoreFile: Provider<String> = providers.environmentVariable("RELEASE_KEYSTORE_FILE")
 val releaseKeystorePassword: Provider<String> = providers.environmentVariable("RELEASE_KEYSTORE_PASSWORD")
 
+// The Firebase project configuration is not in the repository. A build that has it (CI injects it for a
+// release) delivers notifications through Google's push service where Google Play services exist; a build
+// without it compiles and runs with the helper-app path only.
+val firebaseConfigured = file("google-services.json").exists()
+if (firebaseConfigured) {
+    pluginManager.apply(
+        libs.plugins.google.services
+            .get()
+            .pluginId,
+    )
+}
+
 android {
     namespace = "com.frederikberg.mailverdict"
     compileSdk = 37
@@ -98,6 +110,9 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.timber)
     implementation(libs.unifiedpush.connector)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+    implementation(libs.play.services.base)
 
     debugImplementation(libs.nanohttpd)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

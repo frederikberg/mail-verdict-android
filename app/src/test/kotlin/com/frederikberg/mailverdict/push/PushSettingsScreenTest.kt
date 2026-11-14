@@ -1,15 +1,19 @@
 package com.frederikberg.mailverdict.push
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import com.frederikberg.mailverdict.contract.PushChannel
 import com.frederikberg.mailverdict.contract.PushSubscriptionResponse
 import com.frederikberg.mailverdict.contract.PushTransport
+import com.frederikberg.mailverdict.kit.push.PushBackend
 import com.frederikberg.mailverdict.kit.push.PushStatus
 import com.frederikberg.mailverdict.ui.theme.MailVerdictTheme
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -46,10 +50,12 @@ class PushSettingsScreenTest {
         status: PushStatus,
         systemAllowed: Boolean = true,
         notice: String? = null,
+        backend: PushBackend = PushBackend.UnifiedPush,
     ) {
         compose.setContent {
             MailVerdictTheme(dynamicColor = false) {
                 PushSettingsScreen(
+                    backend,
                     status,
                     systemAllowed,
                     notice,
@@ -133,5 +139,32 @@ class PushSettingsScreenTest {
     fun noSystemPromptWhenAndroidAllowsThem() {
         show(registered(), systemAllowed = true)
         compose.onNodeWithTag(PushTags.ALLOW_SYSTEM).assertDoesNotExist()
+    }
+
+    @Test
+    fun googlePushNeedsNoHelperAppSoNoneIsOfferedOrExplained() {
+        show(registered(), backend = PushBackend.Fcm)
+
+        compose.onNodeWithTag(PushTags.CHOOSE_DISTRIBUTOR).assertDoesNotExist()
+        compose.onNodeWithText("Google’s push service", substring = true).assertIsDisplayed()
+        compose.onAllNodesWithText("helper app", substring = true).assertCountEquals(0)
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/push-registered-google.png")
+    }
+
+    @Test
+    fun theHelperAppPathStillOffersToSwitchHelperApp() {
+        show(registered(), backend = PushBackend.UnifiedPush)
+
+        compose.onNodeWithTag(PushTags.CHOOSE_DISTRIBUTOR).assertIsDisplayed()
+        compose.onNodeWithText("through a small helper app", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun googlePushOffersTurningOnWithoutAnythingToInstallFirst() {
+        show(PushStatus.Off, backend = PushBackend.Fcm)
+
+        compose.onNodeWithTag(PushTags.ENABLE).assertIsDisplayed().performClick()
+        compose.onNodeWithTag(PushTags.GET_DISTRIBUTOR).assertDoesNotExist()
+        assertEquals(listOf("enable"), events)
     }
 }

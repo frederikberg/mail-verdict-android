@@ -7,7 +7,7 @@
 Native Android client for [MailVerdict](https://github.com/frederikberg/mail-verdict), a
 self-hosted mail client with an AI spam layer. Your mail, folders and the spam verdicts of your own
 server in a phone-sized app: a message list that holds still while mail arrives, a reader, swipes
-and a selection for triage, and notifications without Google services.
+and a selection for triage, and notifications with or without Google services.
 
 <p align="center"><img src="docs/images/maillist.png" alt="An inbox of mixed mail: a conversation with an attachment, a flagged newsletter, a message marked as spam, one with no subject" width="40%"></p>
 
@@ -44,9 +44,19 @@ Chrome Custom Tab, and the session is sealed with a key that never leaves the ph
 
 ## What you need
 
-A running MailVerdict server (see its README) that offers sign-in to apps. Android 8.0 or newer. For notifications, a UnifiedPush distributor app on the phone, such as
-[ntfy](https://ntfy.sh) or Sunup: the app registers with it, and the server's own Web Push messages
-reach the phone through it.
+A running MailVerdict server (see its README) that offers sign-in to apps. Android 8.0 or newer.
+
+Notifications reach the phone one of two ways, chosen at start:
+
+- With Google Play services, through Google's push service and the MailVerdict push relay, the same
+  relay the iPhone app uses. Nothing to install. Google and the relay carry only an alert sealed with
+  a key that exists on the phone and on your server, so neither can read it.
+- Without Google services, through a [UnifiedPush](https://unifiedpush.org) distributor app on the
+  phone, such as [ntfy](https://ntfy.sh) or Sunup: the app registers with it, and the server's own Web
+  Push messages reach the phone through it. With neither, the app updates while it is open.
+
+A build made without the project's Firebase configuration (`app/google-services.json`, which is not in
+the repository) has the second path only; `docs/development.md` explains the difference.
 
 ## Install
 

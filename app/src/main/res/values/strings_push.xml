@@ -10,9 +10,10 @@
 
     <string name="push_title">Notifications</string>
     <string name="push_intro">MailVerdict sends new mail to your phone through a small helper app you install once, the same way many open-source apps do. It does not use Google services. The helper keeps one connection open and wakes this app when mail arrives.</string>
+    <string name="push_intro_google">New mail reaches your phone through Google’s push service and the MailVerdict push relay. Both only carry a sealed message that this phone alone can open: they see that something arrived and when, never who wrote or what it says.</string>
     <string name="push_status_loading">Checking…</string>
     <string name="push_status_load_failed">Could not check notifications: %1$s</string>
-    <string name="push_status_server_unavailable">This server cannot send notifications: it has no encryption key configured.</string>
+    <string name="push_status_server_unavailable">This server cannot send notifications to phones: it has no encryption key or no push relay configured.</string>
     <string name="push_status_no_distributor">No helper app is installed yet.</string>
     <string name="push_status_off">Notifications are off.</string>
     <string name="push_status_registering">Setting up…</string>

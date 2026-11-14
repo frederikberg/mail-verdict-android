@@ -18,6 +18,7 @@ import timber.log.Timber
  */
 class MailVerdictPushService : PushService() {
     private val graph get() = (application as MailVerdictApp).currentGraph()
+    private val controller get() = graph.unifiedPush
 
     override fun onNewEndpoint(
         endpoint: PushEndpoint,
@@ -27,11 +28,12 @@ class MailVerdictPushService : PushService() {
         if (endpoint.temporary) return
         val keys = endpoint.pubKeySet
         if (keys == null) {
-            graph.push.onRegistrationFailed(getString(R.string.push_no_keys))
+            controller?.onRegistrationFailed(getString(R.string.push_no_keys))
             return
         }
         Timber.i("push endpoint received")
-        graph.appScope.launch { graph.push.onNewEndpoint(PushEndpointInfo(endpoint.url, keys.pubKey, keys.auth)) }
+        val unifiedPush = controller ?: return
+        graph.appScope.launch { unifiedPush.onNewEndpoint(PushEndpointInfo(endpoint.url, keys.pubKey, keys.auth)) }
     }
 
     override fun onMessage(
@@ -49,7 +51,7 @@ class MailVerdictPushService : PushService() {
         instance: String,
     ) {
         Timber.w("push registration failed: %s", reason)
-        graph.push.onRegistrationFailed(
+        controller?.onRegistrationFailed(
             getString(
                 when (reason) {
                     FailedReason.NETWORK -> R.string.push_failed_network
@@ -62,6 +64,7 @@ class MailVerdictPushService : PushService() {
     }
 
     override fun onUnregistered(instance: String) {
-        graph.appScope.launch { graph.push.onUnregistered() }
+        val unifiedPush = controller ?: return
+        graph.appScope.launch { unifiedPush.onUnregistered() }
     }
 }

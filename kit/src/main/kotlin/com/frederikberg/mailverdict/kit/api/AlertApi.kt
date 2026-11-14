@@ -1,9 +1,11 @@
 package com.frederikberg.mailverdict.kit.api
 
 import com.frederikberg.mailverdict.contract.AlertBadgeResponse
+import com.frederikberg.mailverdict.contract.AlertLookupRequest
 import com.frederikberg.mailverdict.contract.AlertResponse
 import com.frederikberg.mailverdict.contract.AlertUnseenCountResponse
 import com.frederikberg.mailverdict.contract.NativePushConfigResponse
+import com.frederikberg.mailverdict.contract.NativeSubscriptionCreate
 import com.frederikberg.mailverdict.contract.PushSubscriptionCreate
 import com.frederikberg.mailverdict.contract.PushSubscriptionResponse
 import com.frederikberg.mailverdict.contract.PushSubscriptionUpdate
@@ -63,6 +65,24 @@ suspend fun ApiClient.createPushSubscription(request: PushSubscriptionCreate): P
         "/alerts/subscriptions",
         method = "POST",
         body = encode(PushSubscriptionCreate.serializer(), request),
+    )
+
+/** Registers this phone for native push, or refreshes the registration under the same installation id. */
+suspend fun ApiClient.registerNativeSubscription(request: NativeSubscriptionCreate): PushSubscriptionResponse =
+    send(
+        PushSubscriptionResponse.serializer(),
+        "/alerts/subscriptions/native",
+        method = "POST",
+        body = encode(NativeSubscriptionCreate.serializer(), request),
+    )
+
+/** Those of [ids] the server still has, dismissed or not. */
+suspend fun ApiClient.lookupAlerts(ids: List<String>): List<AlertResponse> =
+    send(
+        ListSerializer(AlertResponse.serializer()),
+        "/alerts/lookup",
+        method = "POST",
+        body = encode(AlertLookupRequest.serializer(), AlertLookupRequest(ids)),
     )
 
 suspend fun ApiClient.updatePushSubscription(

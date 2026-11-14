@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.frederikberg.mailverdict.R
 import com.frederikberg.mailverdict.contract.PushChannel
+import com.frederikberg.mailverdict.kit.push.PushBackend
 import com.frederikberg.mailverdict.kit.push.PushStatus
 
 object PushTags {
@@ -55,12 +56,13 @@ class PushSettingsCallbacks(
 )
 
 /**
- * The screen that explains the helper app and turns notifications on and off. What it offers is decided
+ * The screen that explains how notifications reach this phone and turns them on and off. What it offers is decided
  * by [status] alone, so the first thing someone without a helper app sees is the one step they need.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PushSettingsScreen(
+    backend: PushBackend,
     status: PushStatus,
     systemAllowed: Boolean,
     notice: String?,
@@ -86,7 +88,10 @@ fun PushSettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(stringResource(R.string.push_intro), style = MaterialTheme.typography.bodyMedium)
+            Text(
+                stringResource(if (backend == PushBackend.Fcm) R.string.push_intro_google else R.string.push_intro),
+                style = MaterialTheme.typography.bodyMedium,
+            )
             Text(
                 statusText(status),
                 style = MaterialTheme.typography.titleMedium,
@@ -112,7 +117,7 @@ fun PushSettingsScreen(
                     Button(onClick = callbacks.onEnable, modifier = Modifier.testTag(PushTags.ENABLE)) {
                         Text(stringResource(R.string.push_enable))
                     }
-                is PushStatus.Registered -> Registered(status, callbacks)
+                is PushStatus.Registered -> Registered(backend, status, callbacks)
                 PushStatus.Loading, PushStatus.Registering, PushStatus.ServerUnavailable -> Unit
             }
             if (!systemAllowed && status is PushStatus.Registered) {
@@ -134,6 +139,7 @@ fun PushSettingsScreen(
 
 @Composable
 private fun Registered(
+    backend: PushBackend,
     status: PushStatus.Registered,
     callbacks: PushSettingsCallbacks,
 ) {
@@ -160,8 +166,13 @@ private fun Registered(
     OutlinedButton(onClick = callbacks.onSendTest, modifier = Modifier.testTag(PushTags.TEST)) {
         Text(stringResource(R.string.push_send_test))
     }
-    OutlinedButton(onClick = callbacks.onChooseDistributor, modifier = Modifier.testTag(PushTags.CHOOSE_DISTRIBUTOR)) {
-        Text(stringResource(R.string.push_choose_distributor))
+    if (backend == PushBackend.UnifiedPush) {
+        OutlinedButton(
+            onClick = callbacks.onChooseDistributor,
+            modifier = Modifier.testTag(PushTags.CHOOSE_DISTRIBUTOR),
+        ) {
+            Text(stringResource(R.string.push_choose_distributor))
+        }
     }
     OutlinedButton(onClick = callbacks.onDisable, modifier = Modifier.testTag(PushTags.DISABLE)) {
         Text(stringResource(R.string.push_disable))

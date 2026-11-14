@@ -75,6 +75,8 @@ class ContractTest {
             "PushSubscriptionUpdate" to PushSubscriptionUpdate.serializer(),
             "PushSubscriptionResponse" to PushSubscriptionResponse.serializer(),
             "NativePushConfigResponse" to NativePushConfigResponse.serializer(),
+            "NativeSubscriptionCreate" to NativeSubscriptionCreate.serializer(),
+            "AlertLookupRequest" to AlertLookupRequest.serializer(),
         )
 
     /** Models the published schema cannot check: no schema of their own, or not a model at all. */
