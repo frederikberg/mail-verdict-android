@@ -53,19 +53,28 @@ class MailListActionsTest {
 
     /** The fake server does what the actions say, so a list read afterwards agrees with them. */
     private fun serverApplies(gate: CompletableDeferred<Unit>? = null) {
+        // What a move out of the list took away can come back: the server still has the message.
+        val taken = HashMap<String, com.frederikberg.mailverdict.contract.MessageSummary>()
         val apply: (FakeTransport.Sent) -> Unit = { sent ->
+            val restored =
+                sent.ids.mapNotNull { id ->
+                    taken.remove(id).takeIf {
+                        sent.action == "move" &&
+                            sent.target == "f1"
+                    }
+                }
             backend.messages =
                 backend.messages.mapNotNull { m ->
                     when {
                         m.id !in sent.ids -> m
-                        sent.action in setOf("archive", "trash", "spam", "expunge") -> null
-                        sent.action == "move" -> if (sent.target == "f1") m else null
+                        sent.action in setOf("archive", "trash", "spam", "expunge") -> null.also { taken[m.id] = m }
+                        sent.action == "move" -> if (sent.target == "f1") m else null.also { taken[m.id] = m }
                         sent.action == "mark_read" -> m.copy(isSeen = true)
                         sent.action == "mark_unread" -> m.copy(isSeen = false)
                         sent.action == "flag" -> m.copy(isFlagged = true)
                         else -> m
                     }
-                }
+                } + restored
         }
         transport.onMessage = {
             gate?.await()
