@@ -21,7 +21,7 @@ class ApiSearchBackendTest {
 
     private val backend =
         ApiSearchBackend(
-            ApiClient(RequestFactory(server.baseUrl) { AuthMode.None }, OkHttpClient()),
+            ApiClient(RequestFactory(server.baseUrl, "Test phone") { AuthMode.None }, OkHttpClient()),
             now = { Instant.parse("2026-11-14T10:30:00Z") },
             zone = { ZoneId.of("UTC") },
         )

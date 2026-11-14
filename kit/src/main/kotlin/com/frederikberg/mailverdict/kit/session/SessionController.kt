@@ -1,12 +1,12 @@
 package com.frederikberg.mailverdict.kit.session
 
 import com.frederikberg.mailverdict.kit.api.getAuthConfig
-import com.frederikberg.mailverdict.kit.api.getMe
 import com.frederikberg.mailverdict.kit.auth.AuthConfigStore
 import com.frederikberg.mailverdict.kit.auth.AuthMode
 import com.frederikberg.mailverdict.kit.auth.OidcClient
 import com.frederikberg.mailverdict.kit.auth.OidcError
 import com.frederikberg.mailverdict.kit.auth.OidcTokenHolder
+import com.frederikberg.mailverdict.kit.auth.OidcTokens
 import com.frederikberg.mailverdict.kit.auth.SignInFlow
 import com.frederikberg.mailverdict.kit.auth.TokenRefresher
 import com.frederikberg.mailverdict.kit.auth.TokenStore
@@ -21,10 +21,12 @@ import com.frederikberg.mailverdict.kit.net.RequestFactory
 import com.frederikberg.mailverdict.kit.stores.MeStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
 import java.net.URI
 
@@ -43,8 +45,12 @@ class SessionController(
     private val tokenStore: TokenStore,
     private val addressStore: ServerAddressStore,
     private val connectivity: Connectivity,
+    /** What the server's list of signed-in devices calls this phone; sent with every request. */
+    private val deviceName: String,
     /** False for fixture mode, which has no event stream to open. */
     private val liveUpdates: Boolean = true,
+    /** False for fixture mode, which has no provider to tell about a sign-out. */
+    private val revokesAtProvider: Boolean = true,
     private val oidc: OidcClient = OidcClient(httpClient),
 ) {
     private val _state = MutableStateFlow<SessionState>(SessionState.SignedOut())
@@ -56,7 +62,9 @@ class SessionController(
     private val networkStatus = NetworkStatus(scope, connectivity)
     private val signInFlow = SignInFlow(oidc)
     private val authConfigs =
-        AuthConfigStore { url -> ApiClient(RequestFactory(url) { AuthMode.None }, httpClient).getAuthConfig() }
+        AuthConfigStore { url ->
+            ApiClient(RequestFactory(url, deviceName) { AuthMode.None }, httpClient).getAuthConfig()
+        }
 
     /** A sign-in whose browser leg is open: held until the browser comes back, never persisted. */
     private class Attempt(
@@ -105,7 +113,7 @@ class SessionController(
         } catch (e: RequestFactory.ConfigurationError) {
             fail(e.message.orEmpty())
         } catch (e: OidcError) {
-            fail(e.message.orEmpty(), tokenModeSuggested = e is OidcError.SignInUnavailable)
+            fail(e.message.orEmpty())
         } catch (e: ApiError) {
             fail(e.userMessage)
         }
@@ -140,7 +148,7 @@ class SessionController(
     /** The device has no browser that can show the sign-in page. */
     fun reportBrowserUnavailable() {
         synchronized(lock) { pending = null }
-        fail("No browser is available to sign in with. Install one, or sign in with a token under Advanced.", true)
+        fail("No browser is available to sign in with. Install one and try again.")
     }
 
     /** The person left the browser without finishing. */
@@ -150,34 +158,16 @@ class SessionController(
     }
 
     /**
-     * Signs in with a pasted token. The token is tried against the server first, so a wrong one
-     * is reported here and never replaces a working sign-in. It is never renewed.
+     * Forgets the credential on this phone at once, then asks the provider to end the sign-in so the
+     * refresh token that was stored is no longer good anywhere. That request is best effort and
+     * bounded: signing out never waits for the network, and an unreachable provider leaves the
+     * refresh token to expire on its own.
      */
-    suspend fun signInWithToken(
-        serverUrl: String,
-        token: String,
-    ) {
-        val url = serverUrl.trim()
-        val bearer = token.trim()
-        _signInStatus.value = SignInStatus.Working
-        try {
-            val mode = AuthMode.Bearer(bearer)
-            ApiClient(RequestFactory(url) { mode }, httpClient).getMe()
-            addressStore.write(url)
-            tokenStore.write(mode)
-            connect(url, mode)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: RequestFactory.ConfigurationError) {
-            fail(e.message.orEmpty())
-        } catch (e: ApiError) {
-            fail(e.userMessage)
-        }
-    }
-
     fun signOut() {
+        val tokens = (tokenStore.read() as? AuthMode.Oidc)?.tokens
         closeCurrent()
         tokenStore.clear()
+        if (tokens != null && revokesAtProvider) scope.launch { revokeAtProvider(tokens) }
         _signInStatus.value = SignInStatus.Idle
         _state.value = SessionState.SignedOut()
     }
@@ -194,11 +184,18 @@ class SessionController(
         scope.launch { connection.me.load() }
     }
 
-    private fun fail(
-        message: String,
-        tokenModeSuggested: Boolean = false,
-    ): Nothing? {
-        _signInStatus.value = SignInStatus.Failed(message, tokenModeSuggested)
+    private suspend fun revokeAtProvider(tokens: OidcTokens) {
+        try {
+            withTimeout(REVOKE_TIMEOUT_MS) { oidc.revoke(tokens, oidc.discover(tokens.issuer)) }
+        } catch (e: CancellationException) {
+            if (e !is TimeoutCancellationException) throw e
+        } catch (e: OidcError) {
+            // Nothing to retry against and nobody to tell: the person has already left.
+        }
+    }
+
+    private fun fail(message: String): Nothing? {
+        _signInStatus.value = SignInStatus.Failed(message)
         return null
     }
 
@@ -219,7 +216,7 @@ class SessionController(
                     reload = { (tokenStore.read() as? AuthMode.Oidc)?.tokens },
                 )
             }
-        val factory = RequestFactory(serverUrl) { holder?.authMode ?: mode }
+        val factory = RequestFactory(serverUrl, deviceName) { holder?.authMode ?: mode }
 
         lateinit var connection: Connection
         val rejected = { detail: String? -> handleRejection(connection, detail) }
@@ -278,6 +275,8 @@ class SessionController(
             current = null
         }
 }
+
+private const val REVOKE_TIMEOUT_MS = 10_000L
 
 /** Compares the redirect the browser ended on with the one the sign-in asked for: scheme, host and path, never the query. */
 object RedirectUri {

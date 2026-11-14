@@ -63,6 +63,19 @@ class ApiErrorTest {
     }
 
     @Test
+    fun aRevokedDeviceEndsTheSessionAndIsNeverRenewed() {
+        val revoked = from(401, """{"detail":"device_revoked"}""")
+        assertTrue(revoked.isDeviceRevoked)
+        assertTrue(revoked.endsSession)
+        assertFalse(revoked.canBeRenewed)
+
+        val expired = from(401, """{"detail":"token_expired"}""")
+        assertFalse(expired.isDeviceRevoked)
+        assertTrue(expired.canBeRenewed)
+        assertFalse(from(403, """{"detail":"admin_required"}""").isDeviceRevoked)
+    }
+
+    @Test
     fun theStatusCodeIsKnownOnlyWhenTheServerAnswered() {
         assertEquals(409, from(409, """{"detail":"conflict"}""").statusCode)
         assertEquals(null, ApiError.Transport("offline").statusCode)

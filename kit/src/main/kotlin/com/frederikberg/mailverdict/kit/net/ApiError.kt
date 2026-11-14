@@ -72,8 +72,17 @@ sealed class ApiError(
     /** The app refused because the signed-in user was disabled: nothing the user does makes the next request succeed. */
     val isDisabled: Boolean get() = this is Detail && statusCode == 403 && detail == DISABLED_DETAIL
 
-    /** Whether the session is over: a rejected credential, or a disabled user. */
-    val endsSession: Boolean get() = isAuthenticationFailure || isDisabled
+    /**
+     * The server removed this device from the user's list of signed-in devices. Renewing the token
+     * would only mint another one for the same device, so nothing is retried.
+     */
+    val isDeviceRevoked: Boolean get() = this is Detail && detail == DEVICE_REVOKED_DETAIL
+
+    /** Whether a refused request is worth sending again under a renewed token. */
+    val canBeRenewed: Boolean get() = isAuthenticationFailure && !isDeviceRevoked
+
+    /** Whether the session is over: a rejected credential, a disabled user or a revoked device. */
+    val endsSession: Boolean get() = isAuthenticationFailure || isDisabled || isDeviceRevoked
 
     /** What the person should see; never empty. */
     val userMessage: String get() = message.orEmpty().ifBlank { "Something went wrong." }
@@ -81,6 +90,9 @@ sealed class ApiError(
     companion object {
         /** The `detail` the server's auth layer answers a disabled user with. */
         const val DISABLED_DETAIL = "user_disabled"
+
+        /** The `detail` of the 401 a revoked device gets. */
+        const val DEVICE_REVOKED_DETAIL = "device_revoked"
 
         /** Classifies a non-2xx answer the transport already has in hand. */
         fun from(

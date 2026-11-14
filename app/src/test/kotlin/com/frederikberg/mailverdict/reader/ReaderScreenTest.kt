@@ -50,7 +50,7 @@ class ReaderScreenTest {
 
     private fun loaded(messageId: String): ReaderState {
         val client = OkHttpClient.Builder().addInterceptor(FixtureInterceptor(Fixtures.routes)).build()
-        val api = ApiClient(RequestFactory("https://fixture.invalid") { AuthMode.None }, client)
+        val api = ApiClient(RequestFactory("https://fixture.invalid", "Test phone") { AuthMode.None }, client)
         val store = ReaderStore(messageId, emptySet(), ApiReaderBackend(api))
         runBlocking { store.load() }
         return store.state.value

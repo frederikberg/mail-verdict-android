@@ -46,7 +46,7 @@ class MailboxesScreenTest {
         val client = OkHttpClient.Builder().addInterceptor(FixtureInterceptor(Fixtures.routes)).build()
         val store =
             MailboxesStore(
-                ApiClient(RequestFactory("https://fixture.invalid") { AuthMode.None }, client),
+                ApiClient(RequestFactory("https://fixture.invalid", "Test phone") { AuthMode.None }, client),
                 CoroutineScope(Dispatchers.Unconfined),
             )
         runBlocking { store.load() }

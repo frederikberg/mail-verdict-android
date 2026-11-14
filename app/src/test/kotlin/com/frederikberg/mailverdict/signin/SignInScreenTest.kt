@@ -34,12 +34,8 @@ class SignInScreenTest {
                 SignInScreen(
                     state = state,
                     onServerUrl = { calls += "url:$it" },
-                    onToken = { calls += "token:$it" },
                     onSignIn = { calls += "sign-in" },
                     onCancel = { calls += "cancel" },
-                    onToggleAdvanced = { calls += "advanced" },
-                    onPasteToken = { calls += "paste" },
-                    onSignInWithToken = { calls += "token-sign-in" },
                 )
             }
         }
@@ -47,11 +43,9 @@ class SignInScreenTest {
 
     private fun state(
         serverUrl: String = "https://mail.example.com",
-        token: String = "",
-        advanced: Boolean = false,
         status: SignInStatus = SignInStatus.Idle,
         rejection: Rejection? = null,
-    ) = SignInUiState(serverUrl, token, advanced, status, rejection)
+    ) = SignInUiState(serverUrl, status, rejection)
 
     @Test
     fun theFirstLaunchAsksForTheServerAndOffersSignIn() {
@@ -93,7 +87,7 @@ class SignInScreenTest {
 
     @Test
     fun aFailureIsShownInPlace() {
-        show(state(status = SignInStatus.Failed("This server has no single sign-in.", tokenModeSuggested = true)))
+        show(state(status = SignInStatus.Failed("This server has no single sign-in.")))
 
         compose.onNodeWithText("This server has no single sign-in.").assertExists()
         compose.onNodeWithTag(SignInTags.SIGN_IN).assertIsEnabled()
@@ -123,30 +117,12 @@ class SignInScreenTest {
     }
 
     @Test
-    fun theTokenModeIsHiddenUntilAskedFor() {
-        show(state())
+    fun aRevokedDeviceIsToldItWasSignedOut() {
+        show(state(rejection = Rejection("device_revoked")))
 
-        compose.onNodeWithTag(SignInTags.TOKEN).assertDoesNotExist()
-        compose.onNodeWithTag(SignInTags.ADVANCED).performClick()
-        assertEquals(listOf("advanced"), calls)
-    }
-
-    @Test
-    fun theTokenModeSaysItIsNeverRenewedAndNeedsAToken() {
-        show(state(advanced = true))
-
-        compose.onNodeWithTag(SignInTags.TOKEN).assertExists()
-        compose.onNodeWithText("A pasted token is never renewed", substring = true).assertExists()
-        compose.onNodeWithTag(SignInTags.TOKEN_SIGN_IN).assertIsNotEnabled()
-        compose.onRoot().captureRoboImage("build/outputs/roborazzi/signin-advanced.png")
-    }
-
-    @Test
-    fun aTokenEnablesTheTokenSignIn() {
-        show(state(advanced = true, token = "pasted"))
-
-        compose.onNodeWithTag(SignInTags.TOKEN_SIGN_IN).assertIsEnabled().performClick()
-
-        assertEquals(listOf("token-sign-in"), calls)
+        compose.onNodeWithText("This device was signed out", substring = true).assertExists()
+        compose.onNodeWithText("Your sign-in was refused. Sign in again.").assertDoesNotExist()
+        compose.onNodeWithText("device_revoked").assertDoesNotExist()
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/signin-device-revoked.png")
     }
 }

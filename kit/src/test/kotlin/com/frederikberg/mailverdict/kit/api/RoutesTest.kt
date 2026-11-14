@@ -37,7 +37,7 @@ class RoutesTest {
 
     private val api =
         ApiClient(
-            RequestFactory("https://mail.example.com") { AuthMode.None },
+            RequestFactory("https://mail.example.com", "Test phone") { AuthMode.None },
             OkHttpClient
                 .Builder()
                 .addInterceptor { chain ->

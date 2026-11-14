@@ -29,7 +29,7 @@ class MeStoreTest {
     private val server = TestServer()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val store =
-        MeStore(ApiClient(RequestFactory(server.baseUrl) { AuthMode.None }, OkHttpClient()), scope)
+        MeStore(ApiClient(RequestFactory(server.baseUrl, "Test phone") { AuthMode.None }, OkHttpClient()), scope)
 
     @After
     fun stop() {

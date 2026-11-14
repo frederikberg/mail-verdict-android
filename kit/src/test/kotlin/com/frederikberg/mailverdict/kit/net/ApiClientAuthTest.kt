@@ -3,9 +3,10 @@ package com.frederikberg.mailverdict.kit.net
 import com.frederikberg.mailverdict.kit.OidcFixtures
 import com.frederikberg.mailverdict.kit.TestServer
 import com.frederikberg.mailverdict.kit.api.getMe
-import com.frederikberg.mailverdict.kit.auth.AuthMode
+import com.frederikberg.mailverdict.kit.auth.CredentialRefreshing
 import com.frederikberg.mailverdict.kit.auth.OidcClient
 import com.frederikberg.mailverdict.kit.auth.OidcTokenHolder
+import com.frederikberg.mailverdict.kit.auth.RefreshOutcome
 import com.frederikberg.mailverdict.kit.auth.TokenRefresher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +27,17 @@ import java.util.concurrent.CopyOnWriteArrayList
  * client over one server: which answers renew, which sign out, which do neither.
  */
 class ApiClientAuthTest {
+    private class CountingRefresher : CredentialRefreshing {
+        var refreshes = 0
+
+        override suspend fun refreshIfNeeded() = Unit
+
+        override suspend fun refresh(afterRejectionOf: String?): RefreshOutcome {
+            refreshes++
+            return RefreshOutcome.Refreshed
+        }
+    }
+
     private val server = TestServer()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -52,7 +64,7 @@ class ApiClientAuthTest {
         val refresher = TokenRefresher(scope, holder, OidcClient(), persist = {})
         val client =
             ApiClient(
-                requests = RequestFactory(server.baseUrl) { holder.authMode },
+                requests = RequestFactory(server.baseUrl, "Test phone") { holder.authMode },
                 httpClient = OkHttpClient(),
                 onAuthenticationFailure = { signedOut += it },
                 credentialRefresher = refresher,
@@ -157,12 +169,34 @@ class ApiClientAuthTest {
 
     /** Without a refresher (a pasted token) a JSON 403 no longer signs out, and the proxy's bare 403 still does. */
     @Test
+    fun aRevokedDeviceIsNotRenewedAndSignsOut() =
+        runBlocking {
+            val signedOut = CopyOnWriteArrayList<ApiError>()
+            val refresher = CountingRefresher()
+            val client =
+                ApiClient(
+                    RequestFactory(server.baseUrl, "Test phone") { OidcFixtures.mode("t") },
+                    OkHttpClient(),
+                    onAuthenticationFailure = { signedOut += it },
+                    credentialRefresher = refresher,
+                )
+            server.script("/api/me", TestServer.jsonError(401, "device_revoked"))
+
+            val error = runCatching { client.getMe() }.exceptionOrNull() as ApiError
+
+            assertTrue(error.isDeviceRevoked)
+            assertEquals(0, refresher.refreshes)
+            assertEquals(1, signedOut.size)
+            assertEquals(1, server.requestsTo("/api/me").size)
+        }
+
+    @Test
     fun aSessionWithNothingToRenewKeepsTheStatusRules() =
         runBlocking {
             val signedOut = CopyOnWriteArrayList<ApiError>()
             val client =
                 ApiClient(
-                    RequestFactory(server.baseUrl) { AuthMode.Bearer("t") },
+                    RequestFactory(server.baseUrl, "Test phone") { OidcFixtures.mode("t") },
                     OkHttpClient(),
                     onAuthenticationFailure = { signedOut += it },
                 )

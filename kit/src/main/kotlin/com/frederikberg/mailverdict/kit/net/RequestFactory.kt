@@ -1,6 +1,7 @@
 package com.frederikberg.mailverdict.kit.net
 
 import com.frederikberg.mailverdict.kit.auth.AuthMode
+import okhttp3.Headers
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
@@ -9,11 +10,13 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
- * Builds every request the app sends. One place owns the base URL, the `/api` prefix and the
- * bearer header, so the REST client and the event stream apply them the same way.
+ * Builds every request the app sends. One place owns the base URL, the `/api` prefix, the bearer
+ * header and the device name, so the REST client and the event stream apply them the same way.
  */
 class RequestFactory(
     baseUrl: String,
+    /** What the server's list of signed-in devices calls this phone; see [DeviceName]. */
+    deviceName: String,
     /** Read at send time rather than captured, so a credential entered or renewed applies to the next request. */
     private val authProvider: () -> AuthMode,
 ) {
@@ -30,6 +33,7 @@ class RequestFactory(
     }
 
     private val base: HttpUrl = parseBase(baseUrl)
+    private val deviceName: String = DeviceName.sanitize(deviceName)
 
     /** [path] starts with `/` and is the route as documented, without the `/api` prefix; it may carry percent-escapes. */
     fun build(
@@ -58,20 +62,22 @@ class RequestFactory(
             .Builder()
             .url(url)
             .method(method, requestBody)
-            .header("Accept", accept)
-            .apply {
-                when (val mode = authProvider()) {
-                    AuthMode.None -> Unit
-                    is AuthMode.Bearer -> if (mode.token.isNotEmpty()) header("Authorization", "Bearer ${mode.token}")
-                    is AuthMode.Oidc ->
-                        if (mode.tokens.accessToken.isNotEmpty()) {
-                            header(
-                                "Authorization",
-                                "Bearer ${mode.tokens.accessToken}",
-                            )
+            .headers(
+                Headers
+                    .Builder()
+                    .add("Accept", accept)
+                    // The name is sent as UTF-8, which is what the server reads.
+                    .addUnsafeNonAscii(DeviceName.HEADER, deviceName)
+                    .apply {
+                        when (val mode = authProvider()) {
+                            AuthMode.None -> Unit
+                            is AuthMode.Oidc ->
+                                if (mode.tokens.accessToken.isNotEmpty()) {
+                                    add("Authorization", "Bearer ${mode.tokens.accessToken}")
+                                }
                         }
-                }
-            }.build()
+                    }.build(),
+            ).build()
     }
 
     companion object {

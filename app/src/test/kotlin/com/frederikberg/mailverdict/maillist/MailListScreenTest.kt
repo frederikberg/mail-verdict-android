@@ -49,7 +49,7 @@ class MailListScreenTest {
         scope: ListScope = ListScope.Folder(Fixtures.PRIVATE_ACCOUNT, "00000000-0000-4000-8000-0000000001f1"),
     ): MailListState {
         val client = OkHttpClient.Builder().addInterceptor(FixtureInterceptor(Fixtures.routes)).build()
-        val api = ApiClient(RequestFactory("https://fixture.invalid") { AuthMode.None }, client)
+        val api = ApiClient(RequestFactory("https://fixture.invalid", "Test phone") { AuthMode.None }, client)
         val store = MailListStore(scope, ApiMailListBackend(api), CoroutineScope(Dispatchers.Unconfined))
         runBlocking { store.start() }
         return store.state.value

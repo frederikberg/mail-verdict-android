@@ -1,6 +1,7 @@
 package com.frederikberg.mailverdict.kit
 
 import com.frederikberg.mailverdict.contract.AuthConfigResponse
+import com.frederikberg.mailverdict.kit.auth.AuthMode
 import com.frederikberg.mailverdict.kit.auth.OidcTokens
 import mockwebserver3.MockResponse
 
@@ -9,6 +10,7 @@ object OidcFixtures {
     const val CLIENT_ID = "native-client"
     const val DISCOVERY = "/.well-known/openid-configuration"
     const val TOKEN = "/oauth/v2/token"
+    const val REVOKE = "/oauth/v2/revoke"
 
     fun config(issuer: String) =
         AuthConfigResponse(
@@ -31,13 +33,19 @@ object OidcFixtures {
         clientId = CLIENT_ID,
     )
 
+    /** A signed-in mode whose access token is [access], for tests that only look at what a request carries. */
+    fun mode(access: String = "t") = AuthMode.Oidc(tokens("https://idp.invalid", access = access, refresh = null))
+
     fun discovery(
         server: TestServer,
         issuer: String = server.baseUrl,
-    ): MockResponse =
-        TestServer.json(
-            """{"issuer":"$issuer","authorization_endpoint":"${server.baseUrl}/oauth/v2/authorize","token_endpoint":"${server.baseUrl}$TOKEN"}""",
+        revocable: Boolean = false,
+    ): MockResponse {
+        val revocation = if (revocable) ""","revocation_endpoint":"${server.baseUrl}$REVOKE"""" else ""
+        return TestServer.json(
+            """{"issuer":"$issuer","authorization_endpoint":"${server.baseUrl}/oauth/v2/authorize","token_endpoint":"${server.baseUrl}$TOKEN"$revocation}""",
         )
+    }
 
     fun tokenAnswer(
         access: String,

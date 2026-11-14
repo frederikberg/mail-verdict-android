@@ -48,7 +48,12 @@ class PushControllerTest {
     @After
     fun stop() = server.close()
 
-    private val api by lazy { ApiClient(RequestFactory(server.baseUrl) { AuthMode.None }, OkHttpClient()) }
+    private val api by lazy {
+        ApiClient(
+            RequestFactory(server.baseUrl, "Test phone") { AuthMode.None },
+            OkHttpClient(),
+        )
+    }
 
     private fun controller(timeoutMs: Long = 30_000) =
         PushController(

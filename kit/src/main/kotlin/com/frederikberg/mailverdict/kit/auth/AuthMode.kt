@@ -10,17 +10,10 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 sealed class AuthMode {
-    /** A LAN or VPN install with nothing in front of the server. */
+    /** No credential: what a request before sign-in goes out with. Never stored. */
     @Serializable
     @SerialName("none")
     data object None : AuthMode()
-
-    /** A token pasted by hand; it is never renewed. */
-    @Serializable
-    @SerialName("bearer")
-    data class Bearer(
-        val token: String,
-    ) : AuthMode()
 
     /** An OpenID Connect sign-in: the access token goes out as a bearer, the refresh token keeps it alive. */
     @Serializable

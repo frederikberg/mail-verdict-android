@@ -54,6 +54,69 @@ class OidcClientTest {
     }
 
     @Test
+    fun discoveryReadsTheRevocationEndpointWhenThereIsOne() {
+        server.script(OidcFixtures.DISCOVERY, OidcFixtures.discovery(server, revocable = true))
+
+        assertEquals(
+            "${server.baseUrl}${OidcFixtures.REVOKE}",
+            runBlocking { client().discover(server.baseUrl) }.revocationEndpoint,
+        )
+        assertNull(metadata().revocationEndpoint)
+    }
+
+    @Test
+    fun discoveryRefusesARevocationEndpointOnAnotherScheme() {
+        val document =
+            """{"issuer":"${server.baseUrl}","authorization_endpoint":"${server.baseUrl}/a","token_endpoint":"${server.baseUrl}/t","revocation_endpoint":"https://x.example.com/r"}"""
+        server.script(OidcFixtures.DISCOVERY, TestServer.json(document))
+        assertThrows(OidcError.DiscoveryFailed::class.java) { runBlocking { client().discover(server.baseUrl) } }
+    }
+
+    @Test
+    fun revokingSendsTheRefreshTokenAndTheClientButNoSecret() {
+        server.script(OidcFixtures.DISCOVERY, OidcFixtures.discovery(server, revocable = true))
+        server.script(OidcFixtures.REVOKE, TestServer.status(200))
+        val tokens = OidcFixtures.tokens(server.baseUrl, access = "access-1", refresh = "refresh+1")
+
+        runBlocking { client().let { it.revoke(tokens, it.discover(server.baseUrl)) } }
+
+        val body = OidcFixtures.bodyOf(server.requestsTo(OidcFixtures.REVOKE).single())
+        assertEquals("token=refresh%2B1&token_type_hint=refresh_token&client_id=${OidcFixtures.CLIENT_ID}", body)
+    }
+
+    @Test
+    fun aSetWithNoRefreshTokenRevokesItsAccessToken() {
+        server.script(OidcFixtures.DISCOVERY, OidcFixtures.discovery(server, revocable = true))
+        server.script(OidcFixtures.REVOKE, TestServer.status(200))
+        val tokens = OidcFixtures.tokens(server.baseUrl, access = "access-1", refresh = null)
+
+        runBlocking { client().let { it.revoke(tokens, it.discover(server.baseUrl)) } }
+
+        val body = OidcFixtures.bodyOf(server.requestsTo(OidcFixtures.REVOKE).single())
+        assertTrue(body, "token=access-1&token_type_hint=access_token" in body)
+    }
+
+    @Test
+    fun revokingAnswersNothingWhenTheProviderOffersNoRevocation() {
+        val tokens = OidcFixtures.tokens(server.baseUrl)
+
+        runBlocking { client().revoke(tokens, metadata()) }
+
+        assertTrue(server.requestsTo(OidcFixtures.REVOKE).isEmpty())
+    }
+
+    @Test
+    fun aRevocationTheProviderAnswersWithAnErrorIsUnavailable() {
+        server.script(OidcFixtures.DISCOVERY, OidcFixtures.discovery(server, revocable = true))
+        server.script(OidcFixtures.REVOKE, TestServer.status(503))
+        val tokens = OidcFixtures.tokens(server.baseUrl)
+
+        assertThrows(OidcError.Unavailable::class.java) {
+            runBlocking { client().let { it.revoke(tokens, it.discover(server.baseUrl)) } }
+        }
+    }
+
+    @Test
     fun anOutageDuringDiscoveryIsUnavailableNotARejection() {
         server.script(OidcFixtures.DISCOVERY, TestServer.status(503))
         val error =

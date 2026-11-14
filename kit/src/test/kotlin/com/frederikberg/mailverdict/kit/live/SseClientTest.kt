@@ -2,6 +2,7 @@
 
 package com.frederikberg.mailverdict.kit.live
 
+import com.frederikberg.mailverdict.kit.OidcFixtures
 import com.frederikberg.mailverdict.kit.auth.AuthMode
 import com.frederikberg.mailverdict.kit.auth.CredentialRefreshing
 import com.frederikberg.mailverdict.kit.auth.OidcTokenHolder
@@ -83,7 +84,7 @@ class SseClientTest {
         val client =
             SseClient(
                 scope = backgroundScope,
-                requests = RequestFactory("https://mail.example.com") { mode(holder) },
+                requests = RequestFactory("https://mail.example.com", "Test phone") { mode(holder) },
                 transport = timed,
                 callbacks = recorder,
                 accountId = accountId,
@@ -479,6 +480,21 @@ class SseClientTest {
             assertEquals(1, rig.transport.connections.size)
         }
 
+    @Test
+    fun aRevokedDeviceSignsOutWithoutAnyRenewal() =
+        runTest {
+            val holder =
+                OidcTokenHolder(OidcTokens("access-1", "refresh-1", null, "https://login.example.com", "native"))
+            val refresher = FakeRefresher(holder, RefreshOutcome.Refreshed)
+            val rig = rig(refresher = refresher)
+            rig.transport.otherwise { refusal(401, """{"detail":"device_revoked"}""") }
+            rig.client.connect()
+            advanceTimeBy(5_000)
+            assertTrue(refresher.calls.isEmpty())
+            assertEquals(1, rig.signedOut.size)
+            assertEquals(1, rig.transport.connections.size)
+        }
+
     /** A 403 with a detail is the app refusing a request, not the proxy refusing a credential: nothing renews, nothing signs out. */
     @Test
     fun anAppRefusalIsNotACredentialRefusal() =
@@ -499,7 +515,7 @@ class SseClientTest {
     @Test
     fun aRefusedStreamWithNothingToRenewItWithSignsOut() =
         runTest {
-            val rig = rig(mode = { AuthMode.Bearer("pasted") })
+            val rig = rig(mode = { OidcFixtures.mode("pasted") })
             rig.transport.otherwise { refusal(401, "") }
             rig.client.connect()
             advanceTimeBy(5_000)
