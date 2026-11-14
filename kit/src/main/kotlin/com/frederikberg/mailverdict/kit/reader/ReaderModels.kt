@@ -43,6 +43,9 @@ data class ReaderMessage(
     val body: ReaderBody,
     val attachments: List<ReaderAttachment>,
     val isUnread: Boolean,
+    val isFlagged: Boolean,
+    /** The folder the message is in. */
+    val folderId: String,
     val isDraft: Boolean,
     val isGlacier: Boolean,
     val glacierOrigin: String?,
@@ -128,6 +131,8 @@ object ReaderMessages {
                     )
                 },
             isUnread = !message.isSeen,
+            isFlagged = message.isFlagged,
+            folderId = message.folderId,
             isDraft = message.isDraft,
             isGlacier = message.isGlacier,
             glacierOrigin = message.originFolderName,

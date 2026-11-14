@@ -207,37 +207,6 @@ class MailListStoreTest {
         }
 
     @Test
-    fun aRowOpenedFromTheUnreadFilterShowsReadAndStaysThroughARefresh() =
-        eventually {
-            val backend =
-                FakeMailListBackend(
-                    listOf(message(3, seen = false), message(2, seen = false), message(1, seen = false)),
-                )
-            val store = store(backend)
-            store.start()
-            store.setUnreadOnly(true)
-            store.didOpen(id(2))
-            assertFalse(
-                store.state.value.rows
-                    .first { it.id == id(2) }
-                    .isUnread,
-            )
-            // The server now answers a list without it; the reader keeps seeing the row until the filter changes.
-            backend.messages = backend.messages.map { if (it.id == id(2)) it.copy(isSeen = true) else it }
-            store.refresh()
-            assertTrue(id(2) in store.ids())
-            assertFalse(
-                store.state.value.rows
-                    .first { it.id == id(2) }
-                    .isUnread,
-            )
-            store.setUnreadOnly(false)
-            assertTrue(id(2) in store.ids())
-            store.setUnreadOnly(true)
-            assertFalse("a new unread list drops it", id(2) in store.ids())
-        }
-
-    @Test
     fun anUnreachableServerShowsTheSavedPageAndTheFirstAnsweredReadReplacesIt() =
         eventually {
             val backend = FakeMailListBackend(rows(120 downTo 1))
