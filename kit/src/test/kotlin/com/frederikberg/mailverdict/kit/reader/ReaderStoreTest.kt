@@ -164,8 +164,22 @@ class ReaderStoreTest {
             val store = store(Backend(listOf(detail(2))))
             store.load()
             assertEquals(ReaderPhase.Loaded, store.state.value.phase)
-            withTimeout(5_000) { while (queue.state.value.intents.single().lastError == null) kotlinx.coroutines.delay(5) }
-            assertEquals("still wanted by the queue, not failed", IntentPhase.Pending, queue.state.value.intents.single().state)
+            withTimeout(5_000) {
+                while (queue.state.value.intents
+                        .single()
+                        .lastError ==
+                    null
+                ) {
+                    kotlinx.coroutines.delay(5)
+                }
+            }
+            assertEquals(
+                "still wanted by the queue, not failed",
+                IntentPhase.Pending,
+                queue.state.value.intents
+                    .single()
+                    .state,
+            )
         }
 
     @Test

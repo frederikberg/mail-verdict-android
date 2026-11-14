@@ -39,21 +39,26 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -66,12 +71,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import com.frederikberg.mailverdict.R
+import com.frederikberg.mailverdict.actions.CollectQueueNotices
+import com.frederikberg.mailverdict.kit.actions.QueueNotice
+import com.frederikberg.mailverdict.kit.actions.UiAction
 import com.frederikberg.mailverdict.kit.live.OfflineNotice
 import com.frederikberg.mailverdict.kit.maillist.ListPhase
 import com.frederikberg.mailverdict.kit.maillist.MailListState
 import com.frederikberg.mailverdict.kit.maillist.MailRowData
 import com.frederikberg.mailverdict.kit.maillist.ViewportAnchor
 import com.frederikberg.mailverdict.ui.OfflineCapsule
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
 object MailListTags {
@@ -85,8 +95,11 @@ object MailListTags {
     const val SELECT_LOADED = "maillist-select-loaded"
     const val STOP_SELECTING = "maillist-stop-selecting"
     const val EMPTY = "maillist-empty"
+    const val SELECTION_MENU = "maillist-selection-menu"
 
     fun row(id: String) = "mail:$id"
+
+    fun swipe(id: String) = "swipe:$id"
 }
 
 /** What a row's slots measure, derived from the text styles and the device's font scale so a row has one height whatever it holds. */
@@ -160,6 +173,7 @@ fun MailListScreen(
     onViewport: (ViewportAnchor?) -> Unit,
     onDismissNotice: () -> Unit,
     selectionActions: @Composable RowScope.() -> Unit = {},
+    actions: ListActions = ListActions.None,
 ) {
     val metrics = rememberRowMetrics()
     val scope = rememberCoroutineScope()
@@ -170,6 +184,7 @@ fun MailListScreen(
     ReportViewport(listState, onViewport)
 
     val snackbar = remember { SnackbarHostState() }
+    CollectQueueNotices(actions.notices, snackbar, actions.onUndo, actions.onRetryAction)
     LaunchedEffect(state.notice) {
         state.notice?.let {
             snackbar.showSnackbar(it)
@@ -182,7 +197,7 @@ fun MailListScreen(
             if (state.isSelecting) {
                 SelectionBar(state.selectedIds.size, onSelectLoaded, onStopSelecting, selectionActions)
             } else {
-                ListBar(title, state, onBack, onUnreadOnly, onThreaded)
+                ListBar(title, state, actions.attention, onBack, onUnreadOnly, onThreaded)
             }
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -209,22 +224,26 @@ fun MailListScreen(
                                 modifier = Modifier.fillMaxSize().testTag(MailListTags.LIST),
                             ) {
                                 items(state.rows, key = { it.id }, contentType = { ROW }) { row ->
-                                    MailRow(
-                                        row = row,
-                                        metrics = metrics,
-                                        selecting = state.isSelecting,
-                                        selected = row.id in state.selectedIds,
-                                        onClick = { if (state.isSelecting) onToggleSelection(row) else onOpenRow(row) },
-                                        onLongClick = {
-                                            if (state.isSelecting) {
-                                                onToggleSelection(
-                                                    row,
-                                                )
-                                            } else {
-                                                onLongPressRow(row)
-                                            }
-                                        },
-                                    )
+                                    SwipeRow(row, actions, enabled = !state.isSelecting) {
+                                        MailRow(
+                                            row = row,
+                                            metrics = metrics,
+                                            selecting = state.isSelecting,
+                                            selected = row.id in state.selectedIds,
+                                            onClick = {
+                                                if (state.isSelecting) {
+                                                    onToggleSelection(
+                                                        row,
+                                                    )
+                                                } else {
+                                                    onOpenRow(row)
+                                                }
+                                            },
+                                            onLongClick = {
+                                                if (state.isSelecting) onToggleSelection(row) else onLongPressRow(row)
+                                            },
+                                        )
+                                    }
                                 }
                                 if (state.isLoadingOlder) {
                                     item(key = FOOTER_KEY, contentType = FOOTER) {
@@ -294,6 +313,7 @@ private fun Capsule(
 private fun ListBar(
     title: String,
     state: MailListState,
+    attention: String?,
     onBack: () -> Unit,
     onUnreadOnly: (Boolean) -> Unit,
     onThreaded: (Boolean) -> Unit,
@@ -304,7 +324,9 @@ private fun ListBar(
             Column {
                 Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val subtitle =
-                    if (state.unreadOnly) {
+                    if (attention != null) {
+                        attention
+                    } else if (state.unreadOnly) {
                         stringResource(
                             R.string.maillist_unread_subtitle,
                         )
@@ -509,5 +531,80 @@ private fun Badges(row: MailRowData) {
             maxLines = 1,
             modifier = Modifier.semantics { contentDescription = "${row.threadCount} messages" },
         )
+    }
+}
+
+/** What the list needs to act on its rows: the swipes, Undo and Retry, and the queue's own word on how it is doing. */
+class ListActions(
+    val notices: Flow<QueueNotice>,
+    /** "2 actions waiting for the network", or null. */
+    val attention: String?,
+    val swipeEnd: (MailRowData) -> UiAction,
+    val swipeStart: (MailRowData) -> UiAction,
+    val onSwipe: (MailRowData, UiAction) -> Unit,
+    val onUndo: (List<String>) -> Unit,
+    val onRetryAction: (String) -> Unit,
+) {
+    companion object {
+        val None =
+            ListActions(emptyFlow(), null, { UiAction.Archive }, { UiAction.Delete }, { _, _ -> }, {}, {})
+    }
+}
+
+/** A row that can be swiped: right archives, left deletes. The row keeps its fixed height; the colour and the word are drawn behind it. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeRow(
+    row: MailRowData,
+    actions: ListActions,
+    enabled: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val currentRow by rememberUpdatedState(row)
+    val currentActions by rememberUpdatedState(actions)
+    val state = rememberSwipeToDismissBoxState()
+    // One swipe is one action: the box settles on a dismissed value once, the action is taken, and the box goes back to rest. The row itself leaves through the queue's projection.
+    LaunchedEffect(state.currentValue) {
+        val value = state.currentValue
+        if (value == SwipeToDismissBoxValue.Settled) return@LaunchedEffect
+        val action =
+            if (value ==
+                SwipeToDismissBoxValue.StartToEnd
+            ) {
+                currentActions.swipeEnd(currentRow)
+            } else {
+                currentActions.swipeStart(currentRow)
+            }
+        currentActions.onSwipe(currentRow, action)
+        state.snapTo(SwipeToDismissBoxValue.Settled)
+    }
+    SwipeToDismissBox(
+        state = state,
+        enableDismissFromStartToEnd = enabled,
+        enableDismissFromEndToStart = enabled,
+        modifier = Modifier.testTag(MailListTags.swipe(row.id)),
+        backgroundContent = {
+            val colors = MaterialTheme.colorScheme
+            val toEnd = state.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+            val toStart = state.dismissDirection == SwipeToDismissBoxValue.EndToStart
+            val action = if (toEnd) actions.swipeEnd(row) else actions.swipeStart(row)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        when {
+                            toEnd -> colors.primaryContainer
+                            toStart && action.isDestructive -> colors.errorContainer
+                            toStart -> colors.secondaryContainer
+                            else -> Color.Transparent
+                        },
+                    ).padding(horizontal = 20.dp),
+                contentAlignment = if (toEnd) Alignment.CenterStart else Alignment.CenterEnd,
+            ) {
+                if (toEnd || toStart) Text(action.title, style = MaterialTheme.typography.labelLarge)
+            }
+        },
+    ) {
+        content()
     }
 }

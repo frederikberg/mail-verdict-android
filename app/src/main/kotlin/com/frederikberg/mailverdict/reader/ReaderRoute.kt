@@ -8,13 +8,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.core.content.FileProvider
 import com.frederikberg.mailverdict.AppGraph
 import com.frederikberg.mailverdict.R
+import com.frederikberg.mailverdict.actions.ConfirmDeleteForeverDialog
+import com.frederikberg.mailverdict.actions.MovePickerSheet
+import com.frederikberg.mailverdict.kit.actions.MessageActionSet
+import com.frederikberg.mailverdict.kit.actions.MoveTarget
+import com.frederikberg.mailverdict.kit.actions.UiAction
 import com.frederikberg.mailverdict.kit.api.getAttachment
 import com.frederikberg.mailverdict.kit.live.OfflineNotice
 import com.frederikberg.mailverdict.kit.net.ApiError
@@ -45,7 +52,29 @@ fun ReaderRoute(
     val reachability by connection.reachability.collectAsState()
     val scope = rememberCoroutineScope()
 
+    val queue by area.actions.state.collectAsState()
+    var moving by remember { mutableStateOf(false) }
+    var moveTargets by remember { mutableStateOf<List<MoveTarget>?>(null) }
+    var confirmForever by remember { mutableStateOf(false) }
+
     LaunchedEffect(store) { store.load() }
+    LaunchedEffect(moving) {
+        if (!moving) return@LaunchedEffect
+        moveTargets = null
+        moveTargets =
+            store.accountOf(messageId)?.let { runCatching { area.moveTargets(it) }.getOrDefault(emptyList()) }.orEmpty()
+    }
+
+    // An action that takes the message out of its folder leaves the reader with nothing to show.
+    fun run(action: UiAction) {
+        when (action) {
+            UiAction.MoveTo -> moving = true
+            UiAction.DeleteForever -> confirmForever = true
+            UiAction.ConfirmVerdict, UiAction.CorrectVerdict ->
+                scope.launch { store.sendVerdictFeedback(messageId, confirming = action == UiAction.ConfirmVerdict) }
+            else -> if (store.perform(action, messageId)) onBack()
+        }
+    }
 
     val web =
         remember(connection, area) {
@@ -83,7 +112,41 @@ fun ReaderRoute(
             }
         },
         onDismissNotice = store::dismissNotice,
+        actions =
+            ReaderActions(
+                notices = area.actions.notices,
+                // Reading the state of the queue is what makes the menu follow an action just taken (Mark as unread turning into Mark as read).
+                groups = queue.let { store.actionContext(messageId)?.let(MessageActionSet::groups).orEmpty() },
+                onAction = ::run,
+                onUndo = area.actions::undo,
+                onRetryAction = { area.actions.retry(listOf(it)) },
+            ),
     )
+
+    if (moving) {
+        val account = store.accountOf(messageId)
+        MovePickerSheet(
+            targets = moveTargets,
+            excludingFolderIds = setOfNotNull(store.folderOf(messageId)),
+            recentIds = account?.let(area.recentMoves::recentIds).orEmpty(),
+            onPick = { target ->
+                area.recentMoves.record(target.accountId, target.folderId)
+                moving = false
+                if (store.perform(UiAction.MoveTo, messageId, target.folderId)) onBack()
+            },
+            onDismiss = { moving = false },
+        )
+    }
+    if (confirmForever) {
+        ConfirmDeleteForeverDialog(
+            count = 1,
+            onConfirm = {
+                confirmForever = false
+                if (store.perform(UiAction.DeleteForever, messageId)) onBack()
+            },
+            onDismiss = { confirmForever = false },
+        )
+    }
 }
 
 /** A link tapped in a message leaves the app; the page itself never navigates. */

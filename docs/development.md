@@ -102,6 +102,14 @@ A reader page loads under one rule (`ReaderRequestPolicy`): inline attachments o
 fetched by the app with its credential, remote content is blocked until the person asks for
 images, and then only images pass. Page script is off.
 
+Every action on a message goes through `ActionQueue` (`kit/actions`): one intent per action, kept
+in a file under the app's files directory (one per server, removed on sign-out), delivered one request
+at a time per account and in order for any one message. An intent's id is its idempotency key, so
+every retry is the same request to the server; a move names the folder the message was seen in, so
+it never follows a message somewhere else. What a list or the reader shows is the server's data with
+the outstanding intents applied (`IntentProjection`). Tests drive the queue in virtual time against
+`FakeTransport`.
+
 The offline cache keeps the newest page of each list visited and each conversation opened under
 the app's cache directory, one directory per server, and is emptied on sign-out. Fixture mode keeps
 nothing.

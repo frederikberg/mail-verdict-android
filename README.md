@@ -10,7 +10,8 @@ and SSE API; it never speaks IMAP or SMTP itself, and the web UI of the server i
 for what it ports.
 
 The project is early: signing in (through the server's identity provider, or with a pasted token),
-the mailbox overview, the message list and the reader work. There is no release yet.
+the mailbox overview, the message list, the reader and triage (archive, delete, move, read and star)
+work. There is no release yet.
 
 ## Building
 

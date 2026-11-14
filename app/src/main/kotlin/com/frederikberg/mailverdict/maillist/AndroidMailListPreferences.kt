@@ -1,6 +1,7 @@
 package com.frederikberg.mailverdict.maillist
 
 import android.content.Context
+import com.frederikberg.mailverdict.kit.actions.RecentMoveTargets
 import com.frederikberg.mailverdict.kit.maillist.MailListPreferences
 import com.frederikberg.mailverdict.kit.reader.InMemoryRecentViewRecord
 import com.frederikberg.mailverdict.kit.reader.RecentViewRecord
@@ -17,7 +18,8 @@ class AndroidMailListPreferences(
     context: Context,
     fixtureMode: Boolean,
 ) : MailListPreferences,
-    RecentViewRecord {
+    RecentViewRecord,
+    RecentMoveTargets {
     private val prefs = context.getSharedPreferences(if (fixtureMode) FIXTURE_FILE else FILE, Context.MODE_PRIVATE)
 
     override fun threaded(): Boolean = prefs.getBoolean(THREADED, true)
@@ -59,7 +61,26 @@ class AndroidMailListPreferences(
             .apply()
     }
 
+    override fun recentIds(accountId: String): List<String> =
+        runCatching {
+            val array = JSONObject(prefs.getString(MOVES, "{}")).optJSONArray(accountId) ?: return emptyList()
+            (0 until array.length()).map(array::getString)
+        }.getOrDefault(emptyList())
+
+    @Synchronized
+    override fun record(
+        accountId: String,
+        folderId: String,
+    ) {
+        val all = runCatching { JSONObject(prefs.getString(MOVES, "{}")) }.getOrDefault(JSONObject())
+        val recent = (listOf(folderId) + recentIds(accountId).filter { it != folderId }).take(RecentMoveTargets.MAX)
+        all.put(accountId, JSONArray(recent))
+        prefs.edit().putString(MOVES, all.toString()).apply()
+    }
+
     private companion object {
+        const val MOVES = "recent_move_targets"
+
         const val FILE = "mailverdict_maillist"
         const val FIXTURE_FILE = "mailverdict_maillist_fixture"
         const val THREADED = "threaded"

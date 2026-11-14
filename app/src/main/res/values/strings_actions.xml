@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="actions_delete_forever_title">Delete forever?</string>
+    <plurals name="actions_delete_forever_text">
+        <item quantity="one">This message will be removed for good. This cannot be undone.</item>
+        <item quantity="other">These %1$d messages will be removed for good. This cannot be undone.</item>
+    </plurals>
+    <string name="actions_delete_forever_confirm">Delete forever</string>
+    <string name="actions_cancel">Cancel</string>
+    <string name="actions_move_title">Move to</string>
+    <string name="actions_move_search">Search folders</string>
+    <string name="actions_move_loading">Loading folders…</string>
+    <string name="actions_move_one_account">Messages of different accounts cannot be moved together.</string>
+</resources>
