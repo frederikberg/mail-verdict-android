@@ -69,6 +69,10 @@ class ApiErrorTest {
         assertTrue(revoked.endsSession)
         assertFalse(revoked.canBeRenewed)
 
+        val unrecognised = from(401, """{"detail":"device_unrecognised"}""")
+        assertTrue(unrecognised.isDeviceRevoked)
+        assertFalse(unrecognised.canBeRenewed)
+
         val expired = from(401, """{"detail":"token_expired"}""")
         assertFalse(expired.isDeviceRevoked)
         assertTrue(expired.canBeRenewed)

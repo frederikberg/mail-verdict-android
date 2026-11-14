@@ -17,7 +17,9 @@ data class Rejection(
     val detail: String?,
 ) {
     /** The server signed this device out from its list of devices, as opposed to refusing a credential. */
-    val deviceRevoked: Boolean get() = detail == ApiError.DEVICE_REVOKED_DETAIL
+    val deviceRevoked: Boolean get() =
+        detail == ApiError.DEVICE_REVOKED_DETAIL ||
+            detail == ApiError.DEVICE_UNRECOGNISED_DETAIL
 }
 
 /** Whether the app has a credential to work with. */

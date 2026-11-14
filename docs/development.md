@@ -27,7 +27,7 @@ The server sits behind a login proxy, so a refused request means one of three th
 `ApiError` tells them apart: a `401` or a bare non-JSON `403` (the proxy rejecting the token) is a
 rejected credential; a `403` with a JSON `detail` is the app refusing that one request and leaves the
 person signed in; the `detail` `user_disabled` ends the session, and so does a `401` with the `detail`
-`device_revoked` (the server removed this phone from its list of devices), which is not renewed first
+`device_revoked` or `device_unrecognised` (the server removed this phone from its list of devices, or does not know it), which is not renewed first
 since a new token would belong to the same phone. Every request carries `X-Device-Name`
 (`DeviceName` sanitises it to at most 64 characters; `DeviceNames` in `:app` picks it).
 

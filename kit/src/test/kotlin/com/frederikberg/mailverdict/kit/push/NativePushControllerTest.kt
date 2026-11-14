@@ -66,7 +66,7 @@ class NativePushControllerTest {
     private fun subscription(
         id: String,
         muted: String = "[]",
-    ) = """{"id":"$id","transport":"apns","label":"Pixel 6","muted_channels":$muted,
+    ) = """{"id":"$id","transport":"native","label":"Pixel 6","muted_channels":$muted,
         |"reminders_enabled":true,"alert_folder_ids":null,"created_at":"2026-11-14T08:00:00Z"}
         """.trimMargin()
 
