@@ -12,6 +12,7 @@ import com.frederikberg.mailverdict.contract.MessageActionRequest
 import com.frederikberg.mailverdict.contract.MessageActionResponse
 import com.frederikberg.mailverdict.contract.MessageDetail
 import com.frederikberg.mailverdict.contract.MessageListResponse
+import com.frederikberg.mailverdict.contract.MessageLocation
 import com.frederikberg.mailverdict.contract.MessageQuoteResponse
 import com.frederikberg.mailverdict.contract.SyncStatusResponse
 import com.frederikberg.mailverdict.contract.ThreadResponse
@@ -74,6 +75,8 @@ suspend fun ApiClient.listUnifiedMessages(
     threaded: Boolean = true,
     isSeen: Boolean? = null,
     before: String? = null,
+    after: String? = null,
+    around: String? = null,
     limit: Int? = null,
 ): MessageListResponse =
     send(
@@ -85,9 +88,18 @@ suspend fun ApiClient.listUnifiedMessages(
                 "threaded" to threaded,
                 "is_seen" to isSeen,
                 "before" to before,
+                "after" to after,
+                "around" to around,
                 "limit" to limit,
             ),
     )
+
+/** Where a message is now: its account, folder and conversation. */
+suspend fun ApiClient.locateMessage(messageId: String): MessageLocation =
+    send(MessageLocation.serializer(), "/messages/$messageId/location")
+
+/** Asks the server to sync the account now rather than at its next interval. */
+suspend fun ApiClient.triggerSync(accountId: String) = sendNoContent("/accounts/$accountId/sync", "POST")
 
 suspend fun ApiClient.getMessage(
     messageId: String,
