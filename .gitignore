@@ -7,5 +7,7 @@ local.properties
 captures/
 .cxx/
 *.keystore
+# The Firebase project configuration of a build that delivers through Google push; see docs/development.md
+app/google-services.json
 *.jks
 .claude/

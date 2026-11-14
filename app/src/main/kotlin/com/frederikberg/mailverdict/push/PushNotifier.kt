@@ -74,6 +74,14 @@ class PushNotifier(
     /** Withdraws the notification of an alert that was read in the app. */
     fun cancel(alertId: String) = manager.cancel(alertId, NOTIFICATION_ID)
 
+    /** The tags of the notifications on screen, which for an alert are its id. */
+    fun shownTags(): List<String> =
+        context
+            .getSystemService(NotificationManager::class.java)
+            .activeNotifications
+            .filter { it.id == NOTIFICATION_ID }
+            .mapNotNull { it.tag }
+
     private fun tapIntent(payload: PushPayload): PendingIntent {
         val intent =
             Intent(context, MainActivity::class.java)

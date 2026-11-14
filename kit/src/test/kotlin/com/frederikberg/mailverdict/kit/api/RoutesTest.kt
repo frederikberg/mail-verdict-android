@@ -4,6 +4,7 @@ import com.frederikberg.mailverdict.contract.BulkActionKind
 import com.frederikberg.mailverdict.contract.BulkActionRequest
 import com.frederikberg.mailverdict.contract.MessageActionKind
 import com.frederikberg.mailverdict.contract.MessageActionRequest
+import com.frederikberg.mailverdict.contract.NativeSubscriptionCreate
 import com.frederikberg.mailverdict.contract.OutboxCreateRequest
 import com.frederikberg.mailverdict.contract.PushChannel
 import com.frederikberg.mailverdict.contract.PushSubscriptionCreate
@@ -139,6 +140,19 @@ class RoutesTest {
                 PushSubscriptionUpdate(mutedChannels = listOf(PushChannel.Mail), remindersEnabled = false),
             )
         }
+        call {
+            api.registerNativeSubscription(
+                NativeSubscriptionCreate(
+                    id,
+                    "https://push.example.com",
+                    "ticket",
+                    "a2V5",
+                    "phone",
+                    listOf(PushChannel.Mail),
+                ),
+            )
+        }
+        call { api.lookupAlerts(listOf(id)) }
         call { api.deletePushSubscription(id) }
         call { api.sendTestPush(id) }
         call { api.createOutbox(OutboxCreateRequest(accountId = id, kind = "send", to = listOf("a@example.com"))) }

@@ -1,7 +1,6 @@
 package com.frederikberg.mailverdict
 
 import android.content.Context
-import android.os.Build
 import com.frederikberg.mailverdict.contract.ContractJson
 import com.frederikberg.mailverdict.kit.auth.AuthMode
 import com.frederikberg.mailverdict.kit.auth.InMemoryTokenStore
@@ -10,9 +9,17 @@ import com.frederikberg.mailverdict.kit.auth.SealedFileTokenStore
 import com.frederikberg.mailverdict.kit.cache.FileOfflineCache
 import com.frederikberg.mailverdict.kit.fixtures.FixtureInterceptor
 import com.frederikberg.mailverdict.kit.fixtures.Fixtures
+import com.frederikberg.mailverdict.kit.net.ApiError
+import com.frederikberg.mailverdict.kit.push.NativePushController
+import com.frederikberg.mailverdict.kit.push.PushBackend
+import com.frederikberg.mailverdict.kit.push.PushBackendChoice
+import com.frederikberg.mailverdict.kit.push.PushControl
 import com.frederikberg.mailverdict.kit.push.PushController
 import com.frederikberg.mailverdict.kit.push.PushRegistrar
+import com.frederikberg.mailverdict.kit.push.PushRelayClient
 import com.frederikberg.mailverdict.kit.push.PushSession
+import com.frederikberg.mailverdict.kit.push.SealedFileNativePushRecordStore
+import com.frederikberg.mailverdict.kit.push.staleAlertIds
 import com.frederikberg.mailverdict.kit.session.ConnectionStores
 import com.frederikberg.mailverdict.kit.session.InMemoryServerAddressStore
 import com.frederikberg.mailverdict.kit.session.SessionController
@@ -24,8 +31,12 @@ import com.frederikberg.mailverdict.platform.AndroidKeystoreKey
 import com.frederikberg.mailverdict.platform.AppPreferences
 import com.frederikberg.mailverdict.platform.DeviceNames
 import com.frederikberg.mailverdict.push.DeepLinks
+import com.frederikberg.mailverdict.push.FcmAvailability
+import com.frederikberg.mailverdict.push.FirebaseFcmPlatform
 import com.frederikberg.mailverdict.push.NoPushPlatform
+import com.frederikberg.mailverdict.push.PushNotifier
 import com.frederikberg.mailverdict.push.PushRecordPreferences
+import com.frederikberg.mailverdict.push.UnifiedPushLegacyCleanup
 import com.frederikberg.mailverdict.push.UnifiedPushPlatform
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,11 +67,26 @@ class AppGraph private constructor(
     val mailCacheRoot: File,
     /** Actions not yet delivered, one file per server; removed on sign-out. */
     val actionsRoot: File,
-    /** Notifications through the phone's UnifiedPush distributor. */
-    val push: PushController,
+    /** Whichever way notifications reach this phone, as the screens and the alert list see it. */
+    val push: PushControl,
+    val pushBackend: PushBackend,
+    /** The helper-app path; null when this phone uses Google's push service. */
+    val unifiedPush: PushController?,
+    /** Google's push service through the relay; null when this phone uses a helper app. */
+    val nativePush: NativePushController?,
     /** A destination a notification tap asked for, until a screen has shown it. */
     val deepLinks: DeepLinks,
 ) {
+    /** Withdraws the notifications of alerts the server says were read or dismissed elsewhere. */
+    suspend fun readSync(notifier: PushNotifier) {
+        val connection = (session.state.value as? SessionState.SignedIn)?.connection ?: return
+        try {
+            staleAlertIds(connection.api, notifier.shownTags()).forEach(notifier::cancel)
+        } catch (e: ApiError) {
+            Timber.w("read-sync lookup failed: %s", e.userMessage)
+        }
+    }
+
     companion object {
         /** The fixture session's server; nothing listens there, the interceptor answers first. */
         private const val FIXTURE_SERVER = "https://fixture.invalid"
@@ -111,7 +137,7 @@ class AppGraph private constructor(
                         actionsRoot.deleteRecursively()
                     }
                 }
-            val push = createPush(context, fixtureMode, session, scope)
+            val wiring = createPush(context, fixtureMode, client, session, scope)
             Timber.i("app graph created, fixtureMode=%s", fixtureMode)
             return AppGraph(
                 fixtureMode,
@@ -124,31 +150,72 @@ class AppGraph private constructor(
                 AndroidMailListPreferences(context, fixtureMode),
                 mailCacheRoot,
                 actionsRoot,
-                push,
+                wiring.control,
+                wiring.backend,
+                wiring.unifiedPush,
+                wiring.native,
                 DeepLinks(),
             )
+        }
+
+        /** The notification path chosen for this start, with the objects of the one that was. */
+        private class PushWiring(
+            val backend: PushBackend,
+            val unifiedPush: PushController?,
+            val native: NativePushController?,
+        ) {
+            val control: PushControl = native ?: unifiedPush!!
         }
 
         private fun createPush(
             context: Context,
             fixtureMode: Boolean,
+            client: OkHttpClient,
             session: SessionController,
             scope: CoroutineScope,
-        ): PushController {
-            val push =
-                PushController(
-                    registrar = PushRegistrar(PushRecordPreferences(context, fixtureMode)),
-                    platform = if (fixtureMode) NoPushPlatform else UnifiedPushPlatform(context),
-                    session = {
-                        (session.state.value as? SessionState.SignedIn)?.connection?.let {
-                            PushSession(
-                                it.api,
-                                it.serverUrl,
-                            )
-                        }
-                    },
-                    deviceLabel = "Android · ${Build.MODEL}",
-                )
+        ): PushWiring {
+            val backend =
+                if (fixtureMode) {
+                    PushBackend.UnifiedPush
+                } else {
+                    PushBackendChoice.decide(FcmAvailability.configured(context), FcmAvailability.playServices(context))
+                }
+            val currentSession = {
+                (session.state.value as? SessionState.SignedIn)?.connection?.let { PushSession(it.api, it.serverUrl) }
+            }
+            val label = "Android · ${DeviceNames.of(context)}"
+            val helperRecords = PushRegistrar(PushRecordPreferences(context, fixtureMode))
+            val wiring =
+                when (backend) {
+                    PushBackend.Fcm ->
+                        PushWiring(
+                            backend,
+                            null,
+                            NativePushController(
+                                relay = PushRelayClient(client),
+                                fcm = FirebaseFcmPlatform(),
+                                records =
+                                    SealedFileNativePushRecordStore(
+                                        File(context.filesDir, "push-native.bin"),
+                                        AndroidKeystoreKey::get,
+                                    ),
+                                legacy = UnifiedPushLegacyCleanup(context, helperRecords),
+                                session = currentSession,
+                                deviceLabel = label,
+                            ),
+                        )
+                    PushBackend.UnifiedPush ->
+                        PushWiring(
+                            backend,
+                            PushController(
+                                registrar = helperRecords,
+                                platform = if (fixtureMode) NoPushPlatform else UnifiedPushPlatform(context),
+                                session = currentSession,
+                                deviceLabel = label,
+                            ),
+                            null,
+                        )
+                }
             if (!fixtureMode) {
                 scope.launch {
                     var wasSignedIn = false
@@ -156,17 +223,17 @@ class AppGraph private constructor(
                         when (state) {
                             is SessionState.SignedIn -> {
                                 wasSignedIn = true
-                                push.refresh()
+                                wiring.control.refresh()
                             }
                             is SessionState.SignedOut -> {
-                                if (wasSignedIn) push.onSignedOut()
+                                if (wasSignedIn) wiring.control.onSignedOut()
                                 wasSignedIn = false
                             }
                         }
                     }
                 }
             }
-            return push
+            return wiring
         }
     }
 }

@@ -70,6 +70,31 @@ data class PushSubscriptionResponse(
     @SerialName("failed_at") val failedAt: String? = null,
 )
 
+/**
+ * A native app registering, or refreshing, itself: the ticket its push relay issued for the device and
+ * the key the device opens notifications with, generated on the device. [label] and [mutedChannels] of
+ * null leave an already registered device's own values alone.
+ */
+@Serializable
+data class NativeSubscriptionCreate(
+    @SerialName("installation_id") val installationId: String,
+    @SerialName("relay_url") val relayUrl: String,
+    val ticket: String,
+    /** Standard base64 of exactly 32 random bytes. */
+    @SerialName("content_key") val contentKey: String,
+    val label: String? = null,
+    @SerialName("muted_channels") val mutedChannels: List<PushChannel>? = null,
+) {
+    /** The key is a secret; a log line never carries it. */
+    override fun toString(): String = "NativeSubscriptionCreate(installationId=$installationId, relayUrl=$relayUrl)"
+}
+
+/** Alert ids a device is still showing, to learn which the server no longer wants shown. */
+@Serializable
+data class AlertLookupRequest(
+    val ids: List<String>,
+)
+
 /** Whether the server can reach native push relays at all, and which ones it trusts. */
 @Serializable
 data class NativePushConfigResponse(
