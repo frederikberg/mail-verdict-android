@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The vendored API contract is synced to MailVerdict 8.0.0, and folders carry whether mail arriving in
+  them goes through the pipeline (`pipeline_enabled`, true when absent).
+
 ## [0.1.0] - 2026-11-14
 
 ### Added
