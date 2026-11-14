@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.core.content.FileProvider
 import com.frederikberg.mailverdict.AppGraph
 import com.frederikberg.mailverdict.R
@@ -37,6 +38,7 @@ fun ReaderRoute(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val area = remember(connection) { graph.mailArea(connection) }
     val store = remember(area, messageId) { area.reader(messageId, folderIds) }
     val state by store.state.collectAsState()
@@ -69,9 +71,12 @@ fun ReaderRoute(
                     .onFailure {
                         store.reportNotice(
                             when (it) {
-                                is ActivityNotFoundException -> context.getString(R.string.reader_no_app_for_attachment)
-                                is ApiError -> context.getString(R.string.reader_attachment_failed, it.userMessage)
-                                else -> context.getString(R.string.reader_attachment_failed, it.message.orEmpty())
+                                is ActivityNotFoundException ->
+                                    resources.getString(
+                                        R.string.reader_no_app_for_attachment,
+                                    )
+                                is ApiError -> resources.getString(R.string.reader_attachment_failed, it.userMessage)
+                                else -> resources.getString(R.string.reader_attachment_failed, it.message.orEmpty())
                             },
                         )
                     }

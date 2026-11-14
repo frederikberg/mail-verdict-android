@@ -164,7 +164,7 @@ fun MailListScreen(
     val metrics = rememberRowMetrics()
     val scope = rememberCoroutineScope()
     val arrivedAbove =
-        KeepPlaceAcrossChanges(listState, state.rows, state.windowAtNewestEdge)
+        rememberRowsArrivedAbove(listState, state.rows, state.windowAtNewestEdge)
     PageAhead(listState, state.rows.size, state.hasOlder, state.hasNewer, onLoadOlder, onLoadNewer)
     RevealLanding(listState, state.landing, state.rows, onLanded)
     ReportViewport(listState, onViewport)

@@ -47,7 +47,7 @@ fun rememberMailListState(
  * Returns how many rows arrived above the reader since they last were at the top.
  */
 @Composable
-fun KeepPlaceAcrossChanges(
+fun rememberRowsArrivedAbove(
     listState: LazyListState,
     rows: List<MailRowData>,
     windowAtNewestEdge: Boolean,

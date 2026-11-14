@@ -13,7 +13,8 @@ object MailFixtures {
 
     private fun thread(n: Int) = "00000000-0000-4000-8000-0000000020" + n.toString().padStart(2, '0')
 
-    private fun quote(text: String) = "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
+    private fun quote(text: String) =
+        "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
 
     private fun nullable(text: String?) = text?.let(::quote) ?: "null"
 
@@ -37,22 +38,31 @@ object MailFixtures {
     ) {
         val summary: String get() =
             """
-            {"id":"${id(n)}","account_id":"${Fixtures.PRIVATE_ACCOUNT}","folder_id":"$INBOX","thread_id":"${thread(thread)}",
+            {"id":"${id(
+                n,
+            )}","account_id":"${Fixtures.PRIVATE_ACCOUNT}","folder_id":"$INBOX","thread_id":"${thread(thread)}",
              "subject":${nullable(subject)},"from_addr":${quote(from)},"to_addrs":["alex@example.com"],
              "received_at":"$receivedAt","is_seen":$seen,"is_flagged":$flagged,"is_answered":$answered,
-             "snippet":${nullable(snippet)},"thread_count":${threadCount ?: "null"},"unread_in_thread":${unreadInThread ?: "null"},
+             "snippet":${nullable(
+                snippet,
+            )},"thread_count":${threadCount ?: "null"},"unread_in_thread":${unreadInThread ?: "null"},
              "mirrored_at":"$receivedAt","has_attachments":$attachments,"verdict_is_spam":${spam ?: "null"}}
             """.trimIndent()
 
         val detail: String get() =
             """
-            {"id":"${id(n)}","account_id":"${Fixtures.PRIVATE_ACCOUNT}","folder_id":"$INBOX","thread_id":"${thread(thread)}",
+            {"id":"${id(
+                n,
+            )}","account_id":"${Fixtures.PRIVATE_ACCOUNT}","folder_id":"$INBOX","thread_id":"${thread(thread)}",
              "subject":${nullable(subject)},"from_addr":${quote(from)},"to_addrs":["Alex Example <alex@example.com>"],
              "received_at":"$receivedAt","created_at":"$receivedAt","is_seen":$seen,"is_flagged":$flagged,
              "snippet":${nullable(snippet)},"body_text":${nullable(text)},"body_html":${nullable(html)},
              "has_blocked_images":$blockedImages,
              "attachments":${if (attachments) {
-                """[{"id":"00000000-0000-4000-8000-0000000030${n.toString().padStart(2, '0')}","filename":"floor-plan.pdf","content_type":"application/pdf","size_bytes":482113}]"""
+                """[{"id":"00000000-0000-4000-8000-0000000030${n.toString().padStart(
+                    2,
+                    '0',
+                )}","filename":"floor-plan.pdf","content_type":"application/pdf","size_bytes":482113}]"""
             } else {
                 "[]"
             }}}
@@ -68,24 +78,33 @@ object MailFixtures {
                 thread = 1,
                 from = "Ada Lovelace <ada@example.com>",
                 subject = "Quarterly planning",
-                snippet = "I put the three options into the shared document. The second one needs your sign-off before Friday.",
+                snippet =
+                    "I put the three options into the shared document. " +
+                        "The second one needs your sign-off before Friday.",
                 receivedAt = "2026-11-14T08:12:00+00:00",
                 seen = false,
                 attachments = true,
                 threadCount = 3,
                 unreadInThread = 2,
-                text = "Hi Alex,\n\nI put the three options into the shared document: https://example.com/plan.\nThe second one needs your sign-off before Friday.\n\nAda",
+                text =
+                    "Hi Alex,\n\nI put the three options into the shared document: https://example.com/plan.\n" +
+                        "The second one needs your sign-off before Friday.\n\nAda",
             ),
             Mail(
                 2,
                 from = "The Weekly Letter <news@letter.example.net>",
-                subject = "Ten things we learned about mail this week, and why the seventh one will surprise you if you read it to the end",
-                snippet = "Open in browser. Our newsletter this week is a long one, with pictures and a table of contents.",
+                subject =
+                    "Ten things we learned about mail this week, and why the seventh one " +
+                        "will surprise you if you read it to the end",
+                snippet =
+                    "Open in browser. Our newsletter this week is a long one, with pictures and a table of contents.",
                 receivedAt = "2026-11-14T06:30:00+00:00",
                 seen = false,
                 flagged = true,
                 text = null,
-                html = "<h2>Ten things</h2><p>Our newsletter this week is a long one.</p><img src=\"https://cdn.example.net/hero.png\" alt=\"hero\">",
+                html =
+                    "<h2>Ten things</h2><p>Our newsletter this week is a long one.</p>" +
+                        "<img src=\"https://cdn.example.net/hero.png\" alt=\"hero\">",
                 blockedImages = true,
             ),
             Mail(
@@ -97,7 +116,13 @@ object MailFixtures {
                 spam = true,
                 text = "Claim now.",
             ),
-            Mail(4, from = "noreply@example.com", subject = null, snippet = null, receivedAt = "2026-11-12T10:00:00+00:00"),
+            Mail(
+                4,
+                from = "noreply@example.com",
+                subject = null,
+                snippet = null,
+                receivedAt = "2026-11-12T10:00:00+00:00",
+            ),
             Mail(
                 5,
                 from = "Grace Hopper <grace@example.com>",
@@ -155,16 +180,27 @@ object MailFixtures {
         buildMap {
             put(
                 "GET /api/accounts/${Fixtures.PRIVATE_ACCOUNT}/messages",
-                """{"messages":[${mails.joinToString(",") { it.summary }}],"has_more":false,"as_of":"2026-11-14T09:00:00+00:00"}""",
+                """{"messages":[${mails.joinToString(
+                    ",",
+                ) { it.summary }}],"has_more":false,"as_of":"2026-11-14T09:00:00+00:00"}""",
             )
             put(
                 "GET /api/accounts/${Fixtures.PRIVATE_ACCOUNT}/folders",
                 """[{"id":"$INBOX","account_id":"${Fixtures.PRIVATE_ACCOUNT}","imap_name":"INBOX","special_use":"inbox",
                     "total_count":1204,"unread_count":12}]""",
             )
-            put("GET /api/unified/mails", """{"messages":[${mails.joinToString(",") { it.summary }}],"has_more":false}""")
+            put(
+                "GET /api/unified/mails",
+                """{"messages":[${mails.joinToString(",") { it.summary }}],"has_more":false}""",
+            )
             mails.drop(1).forEach { put("GET /api/messages/${id(it.n)}/thread", """{"messages":[${it.detail}]}""") }
-            put("GET /api/messages/${id(1)}/thread", """{"messages":[${conversation1.joinToString(",") { it.detail }}]}""")
-            put("POST /api/messages/${id(1)}/action", """{"message_id":"${id(1)}","action":"mark_read","success":true}""")
+            put(
+                "GET /api/messages/${id(1)}/thread",
+                """{"messages":[${conversation1.joinToString(",") { it.detail }}]}""",
+            )
+            put(
+                "POST /api/messages/${id(1)}/action",
+                """{"message_id":"${id(1)}","action":"mark_read","success":true}""",
+            )
         }
 }
