@@ -126,9 +126,8 @@ value class PushTransport(
 
     companion object {
         val WebPush = PushTransport("webpush")
-        val Apns = PushTransport("apns")
         val Native = PushTransport("native")
-        val known: Set<String> = setOf(WebPush.raw, Apns.raw, Native.raw)
+        val known: Set<String> = setOf(WebPush.raw, Native.raw)
     }
 }
 
@@ -144,5 +143,21 @@ value class PushChannel(
         val Mail = PushChannel("mail")
         val System = PushChannel("system")
         val known: Set<String> = setOf(Mail.raw, System.raw)
+    }
+}
+
+/** What a sign-in is: a phone app, a person's browsers, or a machine client. */
+@Serializable
+@JvmInline
+value class SignInKind(
+    val raw: String,
+) {
+    val isKnown: Boolean get() = raw in known
+
+    companion object {
+        val Phone = SignInKind("phone")
+        val Browser = SignInKind("browser")
+        val Machine = SignInKind("machine")
+        val known: Set<String> = setOf(Phone.raw, Browser.raw, Machine.raw)
     }
 }

@@ -77,15 +77,12 @@ class ContractTest {
             "NativePushConfigResponse" to NativePushConfigResponse.serializer(),
             "NativeSubscriptionCreate" to NativeSubscriptionCreate.serializer(),
             "AlertLookupRequest" to AlertLookupRequest.serializer(),
+            "SignInResponse" to SignInResponse.serializer(),
         )
 
     /** Models the published schema cannot check: no schema of their own, or not a model at all. */
     private val unchecked: Set<String> =
         setOf("HealthResponse", "OutboxCreateRequest", "AddressList", "AddressListSerializer")
-
-    /** Values the app already reads that the vendored snapshot does not list yet; the next sync makes the entry redundant. */
-    private val valuesAheadOfTheSnapshot: Map<String, Set<String>> =
-        mapOf("PushSubscriptionResponse.transport" to setOf("native"))
 
     /** Each wire enumeration beside the schema property that lists its values: `Schema.property`. */
     private val enums: Map<String, Set<String>> =
@@ -97,6 +94,7 @@ class ContractTest {
             "BulkActionScope.filter" to BulkScopeFilter.known,
             "PushSubscriptionResponse.transport" to PushTransport.known,
             "PushSubscriptionUpdate.muted_channels" to PushChannel.known,
+            "SignInResponse.kind" to SignInKind.known,
         )
 
     private val schemas: JsonObject =
@@ -142,7 +140,7 @@ class ContractTest {
         assertTrue("the enum map is empty, so nothing was checked", enums.isNotEmpty())
         for ((path, known) in enums) {
             val (schemaName, property) = path.split(".")
-            assertEquals(path, schemaEnum(schemaName, property), known - valuesAheadOfTheSnapshot[path].orEmpty())
+            assertEquals(path, schemaEnum(schemaName, property), known)
         }
     }
 
@@ -167,6 +165,7 @@ class ContractTest {
                 "MessageActionKind",
                 "BulkActionKind",
                 "BulkScopeFilter",
+                "SignInKind",
                 "PushTransport",
                 "PushChannel",
                 "SseEventName",

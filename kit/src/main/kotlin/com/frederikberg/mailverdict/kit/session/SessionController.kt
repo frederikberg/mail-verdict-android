@@ -1,6 +1,8 @@
 package com.frederikberg.mailverdict.kit.session
 
 import com.frederikberg.mailverdict.kit.api.getAuthConfig
+import com.frederikberg.mailverdict.kit.api.listOwnSignIns
+import com.frederikberg.mailverdict.kit.api.revokeOwnSignIn
 import com.frederikberg.mailverdict.kit.auth.AuthConfigStore
 import com.frederikberg.mailverdict.kit.auth.AuthMode
 import com.frederikberg.mailverdict.kit.auth.OidcClient
@@ -47,9 +49,14 @@ class SessionController(
     private val connectivity: Connectivity,
     /** What the server's list of signed-in devices calls this phone; sent with every request. */
     private val deviceName: String,
+    /**
+     * Asked at the start of a sign-out for what to undo on the server for this phone besides its sign-in
+     * row (its push subscription); the answer runs while the credential still works.
+     */
+    private val deviceCleanup: () -> suspend (ApiClient) -> Unit,
     /** False for fixture mode, which has no event stream to open. */
     private val liveUpdates: Boolean = true,
-    /** False for fixture mode, which has no provider to tell about a sign-out. */
+    /** False for fixture mode, which has no server or provider to tell about a sign-out. */
     private val revokesAtProvider: Boolean = true,
     private val oidc: OidcClient = OidcClient(httpClient),
 ) {
@@ -158,16 +165,26 @@ class SessionController(
     }
 
     /**
-     * Forgets the credential on this phone at once, then asks the provider to end the sign-in so the
-     * refresh token that was stored is no longer good anywhere. That request is best effort and
-     * bounded: signing out never waits for the network, and an unreachable provider leaves the
-     * refresh token to expire on its own.
+     * Forgets the credential on this phone at once. The connection's own client keeps the credential in
+     * memory a little longer for the clean-up, which is best effort and bounded and never delays the
+     * sign-out: the phone's push subscription and its row in the server's list of sign-ins are removed,
+     * then the provider is asked to end the sign-in so the stored refresh token is no longer good
+     * anywhere. Unreachable servers leave the rows to be revoked by hand and the refresh token to expire.
      */
     fun signOut() {
         val tokens = (tokenStore.read() as? AuthMode.Oidc)?.tokens
+        val connection = current
+        val cleanup = if (connection != null && revokesAtProvider) deviceCleanup() else null
         closeCurrent()
         tokenStore.clear()
-        if (tokens != null && revokesAtProvider) scope.launch { revokeAtProvider(tokens) }
+        if (connection != null && cleanup != null) {
+            scope.launch {
+                releaseDevice(connection.api, cleanup)
+                if (tokens != null) revokeAtProvider(tokens)
+            }
+        } else if (tokens != null && revokesAtProvider) {
+            scope.launch { revokeAtProvider(tokens) }
+        }
         _signInStatus.value = SignInStatus.Idle
         _state.value = SessionState.SignedOut()
     }
@@ -182,6 +199,26 @@ class SessionController(
         val connection = current ?: return
         connection.liveEventHub.resume()
         scope.launch { connection.me.load() }
+    }
+
+    private suspend fun releaseDevice(
+        api: ApiClient,
+        cleanup: suspend (ApiClient) -> Unit,
+    ) {
+        try {
+            withTimeout(RELEASE_TIMEOUT_MS) {
+                cleanup(api)
+                api.listOwnSignIns().firstOrNull { it.current && it.revokedAt == null }?.let {
+                    api.revokeOwnSignIn(
+                        it.id,
+                    )
+                }
+            }
+        } catch (e: CancellationException) {
+            if (e !is TimeoutCancellationException) throw e
+        } catch (e: ApiError) {
+            // Nothing to retry against and nobody to tell: the person has already left.
+        }
     }
 
     private suspend fun revokeAtProvider(tokens: OidcTokens) {
@@ -277,6 +314,8 @@ class SessionController(
 }
 
 private const val REVOKE_TIMEOUT_MS = 10_000L
+
+private const val RELEASE_TIMEOUT_MS = 6_000L
 
 /** Compares the redirect the browser ended on with the one the sign-in asked for: scheme, host and path, never the query. */
 object RedirectUri {

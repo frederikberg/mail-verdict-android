@@ -7,6 +7,7 @@ import com.frederikberg.mailverdict.kit.auth.AuthMode
 import com.frederikberg.mailverdict.kit.auth.InMemoryTokenStore
 import com.frederikberg.mailverdict.kit.auth.TokenStore
 import com.frederikberg.mailverdict.kit.live.Connectivity
+import com.frederikberg.mailverdict.kit.net.ApiClient
 import com.frederikberg.mailverdict.kit.net.ApiError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,8 +55,12 @@ class SessionControllerTest {
             addresses,
             connectivity,
             "Test phone",
+            { cleanup },
             liveUpdates = false,
         )
+
+    /** What the controller is told to undo on the server at sign-out besides the sign-in row. */
+    private var cleanup: suspend (ApiClient) -> Unit = { _ -> }
 
     /** The whole browser round trip, ending signed in; [revocable] makes the provider name a revocation endpoint. */
     private fun signIn(
@@ -249,6 +254,7 @@ class SessionControllerTest {
                 addresses,
                 connectivity,
                 "Test phone",
+                { cleanup },
                 liveUpdates = false,
             )
         signIn(controller)
@@ -327,6 +333,115 @@ class SessionControllerTest {
 
         Thread.sleep(300)
         assertTrue(server.requestsTo(OidcFixtures.REVOKE).isEmpty())
+    }
+
+    private fun signIns(vararg rows: Triple<String, Boolean, Boolean>): String =
+        rows.joinToString(prefix = "[", postfix = "]") { (id, current, revoked) -> signInRow(id, current, revoked) }
+
+    private fun signInRow(
+        id: String,
+        current: Boolean,
+        revoked: Boolean,
+    ) = """{"id":"$id","user_id":"u","kind":"phone","name":"Test phone","subject":"s",
+        |"first_seen_at":"2026-11-14T08:00:00Z","last_seen_at":"2026-11-14T08:00:00Z",
+        |"revoked_at":${if (revoked) "\"2026-11-14T09:00:00Z\"" else "null"},"current":$current}
+        """.trimMargin()
+
+    private fun awaitRequests(
+        path: String,
+        count: Int = 1,
+    ) {
+        repeat(100) {
+            if (server.requestsTo(path).size >= count) return
+            Thread.sleep(50)
+        }
+        error("no request to $path")
+    }
+
+    @Test
+    fun signingOutRevokesThePhonesOwnRowAndOnlyThatOneAfterTheCleanup() {
+        val controller = controller()
+        signIn(controller)
+        val steps = java.util.concurrent.CopyOnWriteArrayList<String>()
+        cleanup = { _ -> steps += "cleanup" }
+        server.script(
+            "/api/me/sign-ins",
+            TestServer.json(signIns(Triple("other", false, false), Triple("mine", true, false))),
+        )
+        server.script("/api/me/sign-ins/mine/revoke", TestServer.json(signInRow("mine", true, true)))
+
+        controller.signOut()
+
+        awaitRequests("/api/me/sign-ins/mine/revoke")
+        assertEquals(listOf("cleanup"), steps)
+        assertTrue(server.requestsTo("/api/me/sign-ins/other/revoke").isEmpty())
+        assertEquals("POST", server.requestsTo("/api/me/sign-ins/mine/revoke").single().method)
+        assertNull(tokens.read())
+        assertEquals(SessionState.SignedOut(), controller.state.value)
+    }
+
+    @Test
+    fun theRowIsRevokedWithTheCredentialStillGoodAndBeforeTheProviderIsAsked() {
+        val controller = controller()
+        signIn(controller, revocable = true)
+        server.script(OidcFixtures.REVOKE, TestServer.status(200))
+        server.script("/api/me/sign-ins", TestServer.json(signIns(Triple("mine", true, false))))
+        server.script("/api/me/sign-ins/mine/revoke", TestServer.json(signInRow("mine", true, true)))
+
+        controller.signOut()
+
+        awaitRequests(OidcFixtures.REVOKE)
+        val order = server.requests.map { it.url.encodedPath }
+        val row = order.indexOf("/api/me/sign-ins/mine/revoke")
+        assertTrue(order.toString(), row in 0 until order.indexOf(OidcFixtures.REVOKE))
+        assertEquals(
+            "Bearer access-1",
+            server.requestsTo("/api/me/sign-ins/mine/revoke").single().headers["Authorization"],
+        )
+    }
+
+    @Test
+    fun aRowThatIsAlreadyRevokedIsLeftAlone() {
+        val controller = controller()
+        signIn(controller)
+        server.script("/api/me/sign-ins", TestServer.json(signIns(Triple("mine", true, true))))
+
+        controller.signOut()
+
+        awaitRequests("/api/me/sign-ins")
+        Thread.sleep(300)
+        assertTrue(server.requestsTo("/api/me/sign-ins/mine/revoke").isEmpty())
+    }
+
+    @Test
+    fun theCleanupStillRunsWhenTheServerCannotListSignIns() {
+        val controller = controller()
+        signIn(controller)
+        val ran =
+            java.util.concurrent.atomic
+                .AtomicBoolean(false)
+        cleanup = { _ -> ran.set(true) }
+        server.script("/api/me/sign-ins", TestServer.jsonError(500, "boom"))
+
+        controller.signOut()
+
+        awaitRequests("/api/me/sign-ins")
+        assertTrue(ran.get())
+        assertEquals(SessionState.SignedOut(), controller.state.value)
+    }
+
+    @Test
+    fun signingOutOfflineSignsOutAtOnce() {
+        val controller = controller()
+        signIn(controller)
+        server.close()
+        val started = System.nanoTime()
+
+        controller.signOut()
+
+        assertTrue("sign-out waited for the network", System.nanoTime() - started < 1_000_000_000L)
+        assertEquals(SessionState.SignedOut(), controller.state.value)
+        assertNull(tokens.read())
     }
 
     private fun awaitBody(path: String): String {

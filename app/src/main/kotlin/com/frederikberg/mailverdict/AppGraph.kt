@@ -9,6 +9,7 @@ import com.frederikberg.mailverdict.kit.auth.SealedFileTokenStore
 import com.frederikberg.mailverdict.kit.cache.FileOfflineCache
 import com.frederikberg.mailverdict.kit.fixtures.FixtureInterceptor
 import com.frederikberg.mailverdict.kit.fixtures.Fixtures
+import com.frederikberg.mailverdict.kit.net.ApiClient
 import com.frederikberg.mailverdict.kit.net.ApiError
 import com.frederikberg.mailverdict.kit.push.NativePushController
 import com.frederikberg.mailverdict.kit.push.PushBackend
@@ -46,6 +47,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import timber.log.Timber
 import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Constructor wiring for everything the screens share. Nothing is injected by a framework: a
@@ -105,6 +107,11 @@ class AppGraph private constructor(
             val preferences = AppPreferences(context, fixtureMode)
             val deviceName = DeviceNames.of(context)
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            // The push control needs the session and the session's sign-out needs the push control.
+            val pushControl = AtomicReference<PushControl?>(null)
+            val deviceCleanup: () -> suspend (ApiClient) -> Unit = {
+                pushControl.get()?.ownSubscriptionRemoval() ?: { _ -> }
+            }
             val session =
                 if (fixtureMode) {
                     SessionController(
@@ -114,6 +121,7 @@ class AppGraph private constructor(
                         InMemoryServerAddressStore(FIXTURE_SERVER),
                         AlwaysOnline,
                         deviceName,
+                        deviceCleanup,
                         liveUpdates = false,
                         revokesAtProvider = false,
                     )
@@ -125,6 +133,7 @@ class AppGraph private constructor(
                         preferences,
                         AndroidConnectivity(context),
                         deviceName,
+                        deviceCleanup,
                     )
                 }
             session.restore()
@@ -138,6 +147,7 @@ class AppGraph private constructor(
                     }
                 }
             val wiring = createPush(context, fixtureMode, client, session, scope)
+            pushControl.set(wiring.control)
             Timber.i("app graph created, fixtureMode=%s", fixtureMode)
             return AppGraph(
                 fixtureMode,
