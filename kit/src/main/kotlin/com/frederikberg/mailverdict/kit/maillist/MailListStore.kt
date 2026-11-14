@@ -418,6 +418,8 @@ class MailListStore(
         val snapshot =
             synchronized(lock) {
                 if (phase != ListPhase.Loaded || base.isEmpty()) return
+                // Taken from the queue as it is now, not as this store's collector last saw it.
+                rebuildRows()
                 val preserve = if (identity.unreadOnly) keptWhileUnread else emptySet()
                 // A row kept while the unread filter is on stays as the reader last saw it, read, even once the change that made it so has left the queue.
                 val shown = projectedBase.associateBy { it.id }
@@ -855,6 +857,9 @@ class MailListStore(
         val requests = TriageRequests.forRows(rows, action, identity.threaded, targetFolderId)
         if (requests.isEmpty()) return
         val queued = requests.map { queue.enqueue(it) }
+        // The row leaves or changes now, not when the queue's own state next reaches this store's collector.
+        synchronized(lock) { rebuildRows() }
+        publish()
         action.action?.let { kind -> TriageRequests.undoNotice(kind, rows.size)?.let { queue.offerUndo(it, queued) } }
         stopSelecting()
     }
