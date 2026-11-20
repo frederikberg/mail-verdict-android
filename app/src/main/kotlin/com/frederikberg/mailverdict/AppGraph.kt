@@ -71,6 +71,10 @@ class AppGraph private constructor(
     val mailCacheRoot: File,
     /** Actions not yet delivered, one file per server; removed on sign-out. */
     val actionsRoot: File,
+    /** Unsent messages kept against the process ending, one directory per server; removed on sign-out. */
+    val composeRoot: File,
+    /** The canned server of a fixture run, which also records what was sent to it; null otherwise. */
+    val fixtures: FixtureInterceptor?,
     /** Whichever way notifications reach this phone, as the screens and the alert list see it. */
     val push: PushControl,
     val pushBackend: PushBackend,
@@ -124,10 +128,11 @@ class AppGraph private constructor(
             context: Context,
             fixtureMode: Boolean,
         ): AppGraph {
+            val fixtures = if (fixtureMode) FixtureInterceptor(Fixtures.routes) else null
             val client =
                 OkHttpClient
                     .Builder()
-                    .apply { if (fixtureMode) addInterceptor(FixtureInterceptor(Fixtures.routes)) }
+                    .apply { fixtures?.let(::addInterceptor) }
                     .build()
             val preferences = AppPreferences(context, fixtureMode)
             val deviceName = DeviceNames.of(context)
@@ -164,11 +169,13 @@ class AppGraph private constructor(
             session.restore()
             val mailCacheRoot = File(context.cacheDir, "mail")
             val actionsRoot = File(context.filesDir, "actions")
+            val composeRoot = File(context.filesDir, "compose")
             val connectionStores =
                 ConnectionStores(scope, session.state) {
                     if (!fixtureMode) {
                         FileOfflineCache(mailCacheRoot).clear()
                         actionsRoot.deleteRecursively()
+                        composeRoot.deleteRecursively()
                     }
                 }
             val wiring = createPush(context, fixtureMode, client, session, scope)
@@ -185,6 +192,8 @@ class AppGraph private constructor(
                 AndroidMailListPreferences(context, fixtureMode),
                 mailCacheRoot,
                 actionsRoot,
+                composeRoot,
+                fixtures,
                 wiring.control,
                 wiring.backend,
                 wiring.unifiedPush,

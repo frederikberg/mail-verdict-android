@@ -1,11 +1,16 @@
 package com.frederikberg.mailverdict.nav
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -13,6 +18,13 @@ import androidx.navigation.toRoute
 import com.frederikberg.mailverdict.AppGraph
 import com.frederikberg.mailverdict.alerts.AlertsRoute
 import com.frederikberg.mailverdict.alerts.alertsStore
+import com.frederikberg.mailverdict.compose.ComposeOverlay
+import com.frederikberg.mailverdict.compose.ComposeRoute
+import com.frederikberg.mailverdict.compose.composeArea
+import com.frederikberg.mailverdict.compose.toIntent
+import com.frederikberg.mailverdict.compose.toRoute
+import com.frederikberg.mailverdict.kit.api.listAccounts
+import com.frederikberg.mailverdict.kit.compose.ComposeIntent
 import com.frederikberg.mailverdict.kit.maillist.ListScope
 import com.frederikberg.mailverdict.kit.push.PushDestination
 import com.frederikberg.mailverdict.kit.push.resolve
@@ -72,6 +84,17 @@ sealed interface Route {
 
     @Serializable
     data object PushSettings : Route
+
+    /** A composer; [kind] says what opened it and the other fields name what it starts from ([com.frederikberg.mailverdict.compose.toIntent]). */
+    @Serializable
+    data class Compose(
+        val id: String,
+        val kind: String,
+        val messageId: String? = null,
+        val accountId: String? = null,
+        val pendingSendId: String? = null,
+        val mailto: String? = null,
+    ) : Route
 }
 
 @Composable
@@ -119,82 +142,99 @@ fun AppNavigation(
         }
     }
 
-    NavHost(navController, startDestination = Route.Mailboxes) {
-        composable<Route.Mailboxes> {
-            MailboxesRoute(
-                graph = graph,
-                connection = connection,
-                onOpenFolder = {
-                    navController.navigate(Route.MailList(it.displayName, it.accountId, folderId = it.id))
-                },
-                onOpenUnified = {
-                    navController.navigate(Route.MailList(it.name, unifiedViewId = it.id, unifiedName = it.name))
-                },
-                onOpenSettings = { navController.navigate(Route.Settings) },
-                alertBadge = alertBadge,
-                onOpenSearch = { navController.navigate(Route.Search()) },
-                onOpenAlerts = { navController.navigate(Route.Alerts) },
-            )
+    val compose = remember(connection) { graph.composeArea(connection) }
+    val openComposer = { intent: ComposeIntent -> navController.navigate(intent.toRoute()) }
+    var accountNames by remember(connection) { mutableStateOf(emptyMap<String, String>()) }
+    LaunchedEffect(connection) {
+        accountNames =
+            runCatching { connection.api.listAccounts().associate { it.id to it.name } }.getOrDefault(emptyMap())
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        NavHost(navController, startDestination = Route.Mailboxes) {
+            composable<Route.Mailboxes> {
+                MailboxesRoute(
+                    graph = graph,
+                    connection = connection,
+                    onOpenFolder = {
+                        navController.navigate(Route.MailList(it.displayName, it.accountId, folderId = it.id))
+                    },
+                    onOpenUnified = {
+                        navController.navigate(Route.MailList(it.name, unifiedViewId = it.id, unifiedName = it.name))
+                    },
+                    onOpenSettings = { navController.navigate(Route.Settings) },
+                    alertBadge = alertBadge,
+                    onOpenSearch = { navController.navigate(Route.Search()) },
+                    onOpenAlerts = { navController.navigate(Route.Alerts) },
+                )
+            }
+            composable<Route.Settings> {
+                val theme by graph.preferences.theme.collectAsState()
+                val me by connection.me.me.collectAsState()
+                SettingsScreen(
+                    theme = theme,
+                    serverUrl = connection.serverUrl,
+                    me = me,
+                    versionName = versionName,
+                    onTheme = graph.preferences::setTheme,
+                    onSignOut = onSignOut,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable<Route.Search> { entry ->
+                val route = entry.toRoute<Route.Search>()
+                SearchRoute(
+                    graph = graph,
+                    connection = connection,
+                    accountId = route.accountId,
+                    folderId = route.folderId,
+                    scopeLabel = route.scopeLabel,
+                    onOpenMessage = openMessage,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable<Route.Alerts> {
+                AlertsRoute(
+                    graph = graph,
+                    store = alerts,
+                    onOpenMessage = { openMessageById(it) },
+                    onOpenPushSettings = { navController.navigate(Route.PushSettings) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable<Route.PushSettings> {
+                PushSettingsRoute(graph = graph, onBack = { navController.popBackStack() })
+            }
+            composable<Route.MailList> { entry ->
+                val route = entry.toRoute<Route.MailList>()
+                MailListRoute(
+                    graph = graph,
+                    connection = connection,
+                    scope = route.toListScope(),
+                    title = route.title,
+                    aroundMessageId = route.aroundMessageId,
+                    onBack = { navController.popBackStack() },
+                    onOpenMessage = { row, folders -> navController.navigate(Route.Reader(row.id, folders.toList())) },
+                    onCompose = openComposer,
+                )
+            }
+            composable<Route.Reader> { entry ->
+                val route = entry.toRoute<Route.Reader>()
+                ReaderRoute(
+                    graph,
+                    connection,
+                    route.messageId,
+                    route.folderIds.toSet(),
+                    onBack = { navController.popBackStack() },
+                    onCompose = openComposer,
+                )
+            }
+            composable<Route.Compose> { entry ->
+                val intent = remember(entry) { entry.toRoute<Route.Compose>().toIntent() }
+                ComposeRoute(graph, connection, intent, onClose = { navController.popBackStack() })
+            }
         }
-        composable<Route.Settings> {
-            val theme by graph.preferences.theme.collectAsState()
-            val me by connection.me.me.collectAsState()
-            SettingsScreen(
-                theme = theme,
-                serverUrl = connection.serverUrl,
-                me = me,
-                versionName = versionName,
-                onTheme = graph.preferences::setTheme,
-                onSignOut = onSignOut,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable<Route.Search> { entry ->
-            val route = entry.toRoute<Route.Search>()
-            SearchRoute(
-                graph = graph,
-                connection = connection,
-                accountId = route.accountId,
-                folderId = route.folderId,
-                scopeLabel = route.scopeLabel,
-                onOpenMessage = openMessage,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable<Route.Alerts> {
-            AlertsRoute(
-                graph = graph,
-                store = alerts,
-                onOpenMessage = { openMessageById(it) },
-                onOpenPushSettings = { navController.navigate(Route.PushSettings) },
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable<Route.PushSettings> {
-            PushSettingsRoute(graph = graph, onBack = { navController.popBackStack() })
-        }
-        composable<Route.MailList> { entry ->
-            val route = entry.toRoute<Route.MailList>()
-            MailListRoute(
-                graph = graph,
-                connection = connection,
-                scope = route.toListScope(),
-                title = route.title,
-                aroundMessageId = route.aroundMessageId,
-                onBack = { navController.popBackStack() },
-                onOpenMessage = { row, folders -> navController.navigate(Route.Reader(row.id, folders.toList())) },
-            )
-        }
-        composable<Route.Reader> { entry ->
-            val route = entry.toRoute<Route.Reader>()
-            ReaderRoute(
-                graph,
-                connection,
-                route.messageId,
-                route.folderIds.toSet(),
-                onBack = { navController.popBackStack() },
-            )
-        }
+        ComposeOverlay(compose, accountNames, onRestore = openComposer)
     }
 }
 

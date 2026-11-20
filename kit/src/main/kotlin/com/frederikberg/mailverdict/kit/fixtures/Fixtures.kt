@@ -80,5 +80,24 @@ object Fixtures {
                      "account_name":"Work","account_emoji":"💼","imap_name":"INBOX","special_use":"inbox"}]}]
                 """.trimIndent(),
             "GET /api/outbox" to "[]",
+            "GET /api/outbox/pending" to "[]",
+            "GET /api/identities" to
+                """
+                [{"id":"00000000-0000-4000-8000-0000000004a1","account_id":"$PRIVATE_ACCOUNT","address":"alex@example.com",
+                  "display_name":"Alex Example","is_default":true,"created_at":"2026-01-01T00:00:00+00:00"},
+                 {"id":"00000000-0000-4000-8000-0000000004a2","account_id":"$PRIVATE_ACCOUNT","address":"alex@team.example.com",
+                  "display_name":"Alex Example","is_default":false,"created_at":"2026-01-01T00:00:00+00:00"}]
+                """.trimIndent(),
+            "GET /api/contacts/search" to
+                """
+                [{"contact_id":"00000000-0000-4000-8000-0000000005a1","name":"Ada Lovelace","email":"ada@example.com","source":"contact"},
+                 {"contact_id":"00000000-0000-4000-8000-0000000005a2","name":"Grace Hopper","email":"grace@example.com","source":"recent"}]
+                """.trimIndent(),
+            // Accepted at once, as a server without an undo window answers.
+            "POST /api/outbox" to
+                """
+                {"id":"00000000-0000-4000-8000-0000000006a1","account_id":"$PRIVATE_ACCOUNT","kind":"send","status":"pending",
+                 "to":[],"attachments":[],"created_at":"2026-11-14T09:00:00+00:00","updated_at":"2026-11-14T09:00:00+00:00"}
+                """.trimIndent(),
         ) + MailFixtures.routes
 }

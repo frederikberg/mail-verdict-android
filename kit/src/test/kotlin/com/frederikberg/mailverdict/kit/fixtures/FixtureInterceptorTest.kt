@@ -40,4 +40,14 @@ class FixtureInterceptorTest {
 
         assertEquals(listOf("GET /health"), interceptor.requests)
     }
+
+    @Test
+    fun aRouteNamingOneQueryParameterWinsWhenTheRequestCarriesIt() {
+        val messages = "/api/accounts/${Fixtures.PRIVATE_ACCOUNT}/messages"
+        val drafts = get("$messages?threaded=true&folder_id=${MailFixtures.DRAFTS}").use { it.body.string() }
+        val inbox = get("$messages?threaded=true&folder_id=${MailFixtures.INBOX}").use { it.body.string() }
+
+        assertEquals(true, MailFixtures.DRAFT_ID in drafts && "Ten things" !in drafts)
+        assertEquals(true, "Ten things" in inbox && MailFixtures.DRAFT_ID !in inbox)
+    }
 }

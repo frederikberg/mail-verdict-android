@@ -1,5 +1,7 @@
 package com.frederikberg.mailverdict.kit.fixtures
 
+import com.frederikberg.mailverdict.kit.format.MailFormat
+
 /**
  * Canned mail for the list and the reader: one inbox of mixed shapes (a conversation, a flagged
  * newsletter, spam, a message with no subject, one with absurdly long text, an old one) and each
@@ -8,6 +10,10 @@ package com.frederikberg.mailverdict.kit.fixtures
 object MailFixtures {
     const val INBOX = "00000000-0000-4000-8000-0000000001f1"
     const val SENT = "00000000-0000-4000-8000-0000000001f3"
+    const val DRAFTS = "00000000-0000-4000-8000-0000000001f2"
+
+    /** The one saved draft, listed in [DRAFTS]. */
+    val DRAFT_ID = id(10)
 
     private fun id(n: Int) = "00000000-0000-4000-8000-0000000010" + n.toString().padStart(2, '0')
 
@@ -35,14 +41,24 @@ object MailFixtures {
         val text: String? = null,
         val html: String? = null,
         val blockedImages: Boolean = false,
+        val folder: String = INBOX,
+        val draft: Boolean = false,
+        val to: String = "Alex Example <alex@example.com>",
+        /** What `GET /messages/{id}/quote` answers: the body as safe-to-send HTML. */
+        val quoteHtml: String? = null,
     ) {
+        val messageId: String get() = "<fixture-$n@example.com>"
+
+        val quoteBody: String get() =
+            quoteHtml ?: html ?: text.orEmpty().split("\n").joinToString("") { "<p>$it</p>" }
+
         val summary: String get() =
             """
             {"id":"${id(
                 n,
-            )}","account_id":"${Fixtures.PRIVATE_ACCOUNT}","folder_id":"$INBOX","thread_id":"${thread(thread)}",
-             "subject":${nullable(subject)},"from_addr":${quote(from)},"to_addrs":["alex@example.com"],
-             "received_at":"$receivedAt","is_seen":$seen,"is_flagged":$flagged,"is_answered":$answered,
+            )}","account_id":"${Fixtures.PRIVATE_ACCOUNT}","folder_id":"$folder","thread_id":"${thread(thread)}",
+             "subject":${nullable(subject)},"from_addr":${quote(from)},"to_addrs":[${quote(MailFormat.email(to))}],
+             "received_at":"$receivedAt","is_seen":$seen,"is_flagged":$flagged,"is_answered":$answered,"is_draft":$draft,
              "snippet":${nullable(
                 snippet,
             )},"thread_count":${threadCount ?: "null"},"unread_in_thread":${unreadInThread ?: "null"},
@@ -53,8 +69,9 @@ object MailFixtures {
             """
             {"id":"${id(
                 n,
-            )}","account_id":"${Fixtures.PRIVATE_ACCOUNT}","folder_id":"$INBOX","thread_id":"${thread(thread)}",
-             "subject":${nullable(subject)},"from_addr":${quote(from)},"to_addrs":["Alex Example <alex@example.com>"],
+            )}","account_id":"${Fixtures.PRIVATE_ACCOUNT}","folder_id":"$folder","thread_id":"${thread(thread)}",
+             "message_id":${quote(messageId)},"is_draft":$draft,
+             "subject":${nullable(subject)},"from_addr":${quote(from)},"to_addrs":[${quote(to)}],
              "received_at":"$receivedAt","created_at":"$receivedAt","is_seen":$seen,"is_flagged":$flagged,
              "snippet":${nullable(snippet)},"body_text":${nullable(text)},"body_html":${nullable(html)},
              "has_blocked_images":$blockedImages,
@@ -176,6 +193,30 @@ object MailFixtures {
             mails[0],
         )
 
+    /** A draft saved by the web composer: authored text, then the quote wrapper of the message it answers. */
+    private val draft =
+        Mail(
+            10,
+            from = "Alex Example <alex@example.com>",
+            to = "Ada Lovelace <ada@example.com>",
+            subject = "Re: Quarterly planning",
+            snippet = "Option two works for me if we move the review.",
+            receivedAt = "2026-11-14T09:30:00+00:00",
+            folder = DRAFTS,
+            draft = true,
+            text =
+                "Option two works for me if we move the review.\n\n" +
+                    "On Sat, 14 Nov 2026, 08:12, Ada Lovelace wrote:\n" +
+                    "> The second one needs your sign-off before Friday.",
+            quoteHtml =
+                "<p>Option two works for me if we move the review.</p>" +
+                    "<div class=\"gmail_quote\"><div class=\"gmail_attr\">" +
+                    "On Sat, 14 Nov 2026, 08:12, Ada Lovelace wrote:</div>" +
+                    "<blockquote type=\"cite\" class=\"gmail_quote\">" +
+                    "<p>The second one needs your sign-off before Friday.</p>" +
+                    "</blockquote></div>",
+        )
+
     val routes: Map<String, String> =
         buildMap {
             put(
@@ -204,6 +245,24 @@ object MailFixtures {
                     "POST /api/messages/${id(it.n)}/action",
                     """{"message_id":"${id(it.n)}","action":"mark_read","success":true,"applied":true}""",
                 )
+            }
+            put(
+                "GET /api/accounts/${Fixtures.PRIVATE_ACCOUNT}/messages?folder_id=$DRAFTS",
+                """{"messages":[${draft.summary}],"has_more":false,"as_of":"2026-11-14T09:00:00+00:00"}""",
+            )
+            put("GET /api/messages/${id(draft.n)}/thread", """{"messages":[${draft.detail}]}""")
+            // What the composer reads: each message on its own, its quote, and the attachment a forward carries.
+            (mails + conversation1 + draft).forEach {
+                put("GET /api/messages/${id(it.n)}", it.detail)
+                put("GET /api/messages/${id(it.n)}/quote", """{"html":${quote(it.quoteBody)}}""")
+                if (it.attachments) {
+                    put(
+                        "GET /api/messages/${id(
+                            it.n,
+                        )}/attachments/00000000-0000-4000-8000-0000000030${it.n.toString().padStart(2, '0')}",
+                        "%PDF-1.4 fixture floor plan",
+                    )
+                }
             }
             put(
                 "POST /api/accounts/${Fixtures.PRIVATE_ACCOUNT}/messages/bulk-action",

@@ -232,6 +232,7 @@ class ReaderStore(
             isInJunk = roles[message.folderId] == "junk",
             isInGlacier = message.isGlacier,
             verdictIsSpam = message.isSpam,
+            isDraft = message.isDraft,
         )
     }
 

@@ -44,7 +44,8 @@ private fun AppGraph.intentPersistence(connection: Connection): IntentPersistenc
         FileIntentPersistence(File(actionsRoot, serverDirectory(connection.serverUrl) + ".json"))
     }
 
-private fun serverDirectory(serverUrl: String): String =
+/** One directory name per server, the same wherever the app keeps something per server. */
+internal fun serverDirectory(serverUrl: String): String =
     MessageDigest
         .getInstance("SHA-256")
         .digest(serverUrl.trim().lowercase().toByteArray())

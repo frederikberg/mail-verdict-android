@@ -56,8 +56,10 @@ class ApiClient(
         timeoutMs: Long? = null,
         /** Statuses whose body is the answer rather than an error, such as the readiness probe's 503. */
         answerStatuses: Set<Int> = emptySet(),
+        /** The type of [body]; a multipart form names its own boundary here. */
+        contentType: String = JSON_CONTENT,
     ): T {
-        val response = exchange(path, method, query, body, if (body != null) JSON_CONTENT else null, timeoutMs)
+        val response = exchange(path, method, query, body, if (body != null) contentType else null, timeoutMs)
         if (response.code !in answerStatuses) checkStatus(response)
         return try {
             json.decodeFromString(strategy, response.body.decodeToString())
