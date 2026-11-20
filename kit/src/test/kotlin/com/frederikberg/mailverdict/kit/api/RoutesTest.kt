@@ -164,6 +164,8 @@ class RoutesTest {
         call { api.listOutbox(id, "queued") }
         call { api.listPendingSends(id) }
         call { api.cancelPendingSend(id) }
+        call { api.getPendingSendAttachment(id, id) }
+        call { api.searchContacts("ada") }
 
         assertTrue("the client sent ${sent.size} requests", sent.size >= 30)
         for (request in sent) {

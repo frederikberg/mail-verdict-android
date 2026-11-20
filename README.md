@@ -7,7 +7,8 @@
 Native Android client for [MailVerdict](https://github.com/frederikberg/mail-verdict), a
 self-hosted mail client with an AI spam layer. Your mail, folders and the spam verdicts of your own
 server in a phone-sized app: a message list that holds still while mail arrives, a reader, swipes
-and a selection for triage, and notifications with or without Google services.
+and a selection for triage, a composer for new mail, replies, forwards and drafts, and notifications
+with or without Google services.
 
 <p align="center"><img src="docs/images/maillist.png" alt="An inbox of mixed mail: a conversation with an attachment, a flagged newsletter, a message marked as spam, one with no subject" width="40%"></p>
 
@@ -21,6 +22,9 @@ and a selection for triage, and notifications with or without Google services.
   moves a message that is no longer where you saw it. Undo moves it back.
 - **Mail you read can be read again offline.** The newest page of each list and every conversation
   you opened are kept on the phone and removed on sign-out.
+- **Replies go to the right people.** Reply, Reply all and Forward address, quote and thread a
+  message the way the web app does, a message you sent included, and a send can be taken back
+  while the server's undo window lasts.
 - **Remote content is blocked until you ask.** Message HTML runs with script off, and nothing but
   the server's own attachments and, once you tap Show images, images is fetched.
 
@@ -29,6 +33,9 @@ and a selection for triage, and notifications with or without Google services.
 <td width="33%"><img src="docs/images/mailboxes.png" alt="The mailbox overview: unified views, then each account's folders with unread counts"></td>
 <td width="33%"><img src="docs/images/reader-conversation.png" alt="A conversation, newest message first, the opened message expanded with its attachment"></td>
 <td width="33%"><img src="docs/images/maillist-selection-menu.png" alt="Two messages selected, with Delete and the menu of the other actions"></td>
+</tr>
+<tr>
+<td width="33%"><img src="docs/images/compose-reply.png" alt="A reply addressed to the sender, with the quoted original under the text"></td>
 </tr>
 </table>
 
@@ -82,7 +89,10 @@ A debug build started with `--ez fixture_mode true` shows canned data instead of
 ## Known limitations
 
 - Folders can be created and deleted on the server, never renamed or re-nested; the app follows.
-- No compose or reply yet, no calendar or contacts, no orders screens, no widgets.
+- The composer writes plain text: a draft written with formatting elsewhere keeps it while its text
+  is left as it is, and loses it once edited here. Pasted images and inline pictures are not
+  offered; a draft's inline pictures come back as ordinary attachments.
+- No calendar or contacts screens, no orders screens, no widgets, no share sheet.
 - Moving a message into a glacier is not offered; moves across accounts in one selection are not
   supported.
 - A phone using a UnifiedPush helper app keeps a notification of mail read elsewhere until the app is

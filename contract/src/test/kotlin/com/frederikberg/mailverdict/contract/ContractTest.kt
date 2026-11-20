@@ -79,6 +79,7 @@ class ContractTest {
             "AlertLookupRequest" to AlertLookupRequest.serializer(),
             "NotificationResponse" to NotificationResponse.serializer(),
             "SignInResponse" to SignInResponse.serializer(),
+            "ContactSearchHitOut" to ContactSearchHitOut.serializer(),
         )
 
     /** Models the published schema cannot check: no schema of their own, or not a model at all. */
@@ -96,6 +97,7 @@ class ContractTest {
             "PushSubscriptionResponse.transport" to PushTransport.known,
             "PushSubscriptionUpdate.muted_channels" to PushChannel.known,
             "SignInResponse.kind" to SignInKind.known,
+            "ContactSearchHitOut.source" to ContactSource.known,
         )
 
     private val schemas: JsonObject =
@@ -170,6 +172,7 @@ class ContractTest {
                 "PushTransport",
                 "PushChannel",
                 "SseEventName",
+                "ContactSource",
             )
         val unregistered = declared - models.keys - unchecked - enumClasses
         assertTrue("serializable types missing from ContractTest: $unregistered", unregistered.isEmpty())

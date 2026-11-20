@@ -10,6 +10,10 @@ import com.frederikberg.mailverdict.kit.format.folderDisplayName
 enum class UiAction(
     val title: String,
 ) {
+    Reply("Reply"),
+    ReplyAll("Reply all"),
+    Forward("Forward"),
+    EditDraft("Edit draft"),
     MarkRead("Mark as read"),
     MarkUnread("Mark as unread"),
     Star("Star"),
@@ -40,8 +44,11 @@ enum class UiAction(
                 Delete -> TriageAction.Trash
                 DeleteForever -> TriageAction.Expunge
                 MoveTo -> TriageAction.Move
-                ConfirmVerdict, CorrectVerdict -> null
+                ConfirmVerdict, CorrectVerdict, Reply, ReplyAll, Forward, EditDraft -> null
             }
+
+    /** Opens the composer rather than acting on the message. */
+    val composes: Boolean get() = this == Reply || this == ReplyAll || this == Forward || this == EditDraft
 }
 
 /** What the set needs to decide which actions apply: state only, no identifiers. */
@@ -54,13 +61,15 @@ data class ActionContext(
     val isInGlacier: Boolean = false,
     /** The spam filter's verdict, when the message carries one; offered only where one message is shown. */
     val verdictIsSpam: Boolean? = null,
+    /** A saved draft: it is edited, not answered. */
+    val isDraft: Boolean = false,
 )
 
 data class ActionGroup(
     val kind: Kind,
     val actions: List<UiAction>,
 ) {
-    enum class Kind { Verdict, State, Destructive }
+    enum class Kind { Compose, Verdict, State, Destructive }
 }
 
 /** The one list every surface renders from, so the selection bar, the swipes and the reader's menu never drift into different sets for the same message. */
@@ -83,6 +92,22 @@ object MessageActionSet {
         groups += ActionGroup(ActionGroup.Kind.Destructive, listOf(destructive(context)))
         return groups
     }
+
+    /** Answering one message: reply, reply all and forward, or for a draft, editing it. Offered only where one message is shown. */
+    fun compose(context: ActionContext): ActionGroup =
+        ActionGroup(
+            ActionGroup.Kind.Compose,
+            if (context.isDraft) {
+                listOf(
+                    UiAction.EditDraft,
+                )
+            } else {
+                listOf(UiAction.Reply, UiAction.ReplyAll, UiAction.Forward)
+            },
+        )
+
+    /** Everything a surface showing one message offers: answering it first, then [groups]. */
+    fun forMessage(context: ActionContext): List<ActionGroup> = listOf(compose(context)) + groups(context)
 
     /** Delete moves to Trash; in Trash or the glacier it is the only copy and the action is permanent. */
     fun destructive(context: ActionContext): UiAction =

@@ -26,6 +26,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -89,6 +90,11 @@ object ReaderTags {
     fun attachment(id: String) = "reader-attachment:$id"
 
     fun body(id: String) = "reader-body:$id"
+
+    fun answer(
+        action: UiAction,
+        id: String,
+    ) = "reader-answer:${action.name}:$id"
 }
 
 /**
@@ -191,6 +197,8 @@ fun ReaderScreen(
                                 onShowImages = { onShowImages(message.id) },
                                 onShowFullBody = { onShowFullBody(message.id) },
                                 onOpenAttachment = { onOpenAttachment(message, it) },
+                                answers = actions.answers(message.id),
+                                onAnswer = { actions.onAnswer(it, message.id) },
                             )
                         }
                     }
@@ -213,6 +221,8 @@ private fun MessageCard(
     onShowImages: () -> Unit,
     onShowFullBody: () -> Unit,
     onOpenAttachment: (ReaderAttachment) -> Unit,
+    answers: ActionGroup? = null,
+    onAnswer: (UiAction) -> Unit = {},
 ) {
     val colors = MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth().testTag(ReaderTags.message(message.id))) {
@@ -287,7 +297,30 @@ private fun MessageCard(
             Banners(message)
             message.attachments.forEach { AttachmentRow(it, onClick = { onOpenAttachment(it) }) }
             Body(message, fullBody, web, onShowImages, onShowFullBody)
+            answers?.let { Answers(it, message.id, onAnswer) }
             Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+/** Reply, Reply all and Forward under a message, or Edit draft under a draft: the same entries as the menu. */
+@Composable
+private fun Answers(
+    group: ActionGroup,
+    messageId: String,
+    onAnswer: (UiAction) -> Unit,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        group.actions.forEach { action ->
+            OutlinedButton(
+                onClick = { onAnswer(action) },
+                modifier = Modifier.testTag(ReaderTags.answer(action, messageId)),
+            ) {
+                Text(action.title, maxLines = 1)
+            }
         }
     }
 }
@@ -450,6 +483,9 @@ class ReaderActions(
     val onAction: (UiAction) -> Unit,
     val onUndo: (List<String>) -> Unit,
     val onRetryAction: (String) -> Unit,
+    /** The answering entries under one message of the conversation, by its id. */
+    val answers: (String) -> ActionGroup? = { null },
+    val onAnswer: (UiAction, String) -> Unit = { _, _ -> },
 ) {
     companion object {
         val None = ReaderActions(emptyFlow(), emptyList(), {}, {}, {})

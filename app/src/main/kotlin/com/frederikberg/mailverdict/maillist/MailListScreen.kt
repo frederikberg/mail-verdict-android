@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
@@ -30,6 +31,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -85,6 +87,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
 object MailListTags {
+    const val COMPOSE = "maillist-compose"
     const val LIST = "maillist-list"
     const val UNREAD_FILTER = "maillist-unread-filter"
     const val MORE = "maillist-more"
@@ -174,6 +177,8 @@ fun MailListScreen(
     onDismissNotice: () -> Unit,
     selectionActions: @Composable RowScope.() -> Unit = {},
     actions: ListActions = ListActions.None,
+    /** A new message, written from this list; null where the list offers none. */
+    onCompose: (() -> Unit)? = null,
 ) {
     val metrics = rememberRowMetrics()
     val scope = rememberCoroutineScope()
@@ -201,6 +206,16 @@ fun MailListScreen(
             }
         },
         snackbarHost = { SnackbarHost(snackbar) },
+        floatingActionButton = {
+            if (onCompose != null && !state.isSelecting) {
+                ExtendedFloatingActionButton(
+                    onClick = onCompose,
+                    icon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                    text = { Text(stringResource(R.string.compose_new)) },
+                    modifier = Modifier.testTag(MailListTags.COMPOSE),
+                )
+            }
+        },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (val phase = state.phase) {

@@ -16,6 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - A notification of mail read elsewhere is withdrawn when the app comes to the front and when the
   stream reports a dismissal or a resync, not only when Google's push service asks for it. A phone on
   the helper-app path gets this while the app is open and not in the background.
+- Writing mail: a new message from any list's Compose button, Reply, Reply all and Forward under each
+  message of a conversation and in the reader's menu, and `mailto:` links in a message. Recipients,
+  subject, threading headers and the quote follow the web app's rules, including a message sent from
+  one of the account's own addresses being answered to whoever it went to. From offers the account's
+  identities, and a reply goes out as the address the message was sent to. Recipients are suggested
+  from the server's contacts as you type.
+- Drafts: leaving a composer with unsaved changes saves it as a draft on the server, and a message in
+  Drafts opens in the composer with its recipients, text, quote and files, replacing itself when
+  saved or sent. What is being written is also kept on the phone every second, and offered back if
+  the app ended before it was saved; it is removed on sign-out.
+- Undo send: a send held by the server's undo window shows a countdown with Undo over every screen,
+  and Undo reopens the composer with everything it held.
+- Attachments from the system file picker, sent with the message; a forward carries the original's
+  files along.
 
 ### Changed
 

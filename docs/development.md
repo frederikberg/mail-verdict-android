@@ -121,6 +121,24 @@ The offline cache keeps the newest page of each list visited and each conversati
 the app's cache directory, one directory per server, and is emptied on sign-out. Fixture mode keeps
 nothing.
 
+## Writing mail
+
+The composer's logic is `:kit`'s `compose/`, its screens `:app`'s `compose/`. `ComposeReply` derives
+recipients, subject, threading headers and the quote of a reply, reply all or forward with the rules
+of the server's web app (`ui/src/lib/reply.ts`), and its tests are that file's tests case for case.
+The body is plain text, sent the way the web composer sends one: `body_text` is the text with the
+`> `-quoted original under it, `body_html` one paragraph per line followed by the quote wrapper the
+web editor writes, so a draft saved by either reopens in the other with its quote. A draft is read
+back through the quote route and split into text and quote again; a body left unchanged goes out as
+the HTML it came in as. Files go as the multipart form of `POST /outbox`.
+
+`ComposerStore` holds one composer from its intent to its submit: leaving with unsaved changes saves
+a draft, Discard asks first, and every second while something is unsaved a snapshot goes to a file
+per server under the app's files directory (removed on sign-out, nothing in fixture mode), offered
+back the next time the same composer opens. A send the server holds for its undo window lands in
+`UndoSendStore`, which the capsule over the navigation shows until the window passes; Undo cancels it
+and reopens the composer with what it held. Tests drive both in virtual time.
+
 ## Search, alerts and notifications
 
 Search keeps its logic in `:kit` (`search/`): `SearchStore` debounces typing, cancels what a newer

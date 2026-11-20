@@ -29,6 +29,7 @@ import com.frederikberg.mailverdict.kit.actions.ActionGroup
 import com.frederikberg.mailverdict.kit.actions.MessageActionSet
 import com.frederikberg.mailverdict.kit.actions.MoveTarget
 import com.frederikberg.mailverdict.kit.actions.UiAction
+import com.frederikberg.mailverdict.kit.compose.ComposeIntent
 import com.frederikberg.mailverdict.kit.live.OfflineNotice
 import com.frederikberg.mailverdict.kit.maillist.ListScope
 import com.frederikberg.mailverdict.kit.maillist.MailRowData
@@ -46,6 +47,7 @@ fun MailListRoute(
     aroundMessageId: String?,
     onBack: () -> Unit,
     onOpenMessage: (row: MailRowData, folderIds: Set<String>) -> Unit,
+    onCompose: (ComposeIntent) -> Unit = {},
 ) {
     val area = remember(connection) { graph.mailArea(connection) }
     val store = remember(area, scope, aroundMessageId) { area.list(scope, aroundMessageId) }
@@ -101,13 +103,18 @@ fun MailListRoute(
             }
         },
         onOpenRow = { row ->
-            store.didOpen(row.id)
-            val folders =
-                when (scope) {
-                    is ListScope.Folder -> setOf(scope.folderId)
-                    is ListScope.Unified -> state.context.memberFolderIds.ifEmpty { setOf(row.folderId) }
-                }
-            onOpenMessage(row, folders)
+            // A saved draft opens in the composer, the way the web opens it in its draft editor.
+            if (row.isDraft) {
+                onCompose(ComposeIntent(ComposeIntent.Kind.Draft(row.id)))
+            } else {
+                store.didOpen(row.id)
+                val folders =
+                    when (scope) {
+                        is ListScope.Folder -> setOf(scope.folderId)
+                        is ListScope.Unified -> state.context.memberFolderIds.ifEmpty { setOf(row.folderId) }
+                    }
+                onOpenMessage(row, folders)
+            }
         },
         onLongPressRow = { store.startSelecting(it.id) },
         onToggleSelection = { store.toggleSelection(it.id) },
@@ -138,6 +145,7 @@ fun MailListRoute(
                 onUndo = area.actions::undo,
                 onRetryAction = { area.actions.retry(listOf(it)) },
             ),
+        onCompose = { onCompose(ComposeIntent(ComposeIntent.Kind.New((scope as? ListScope.Folder)?.accountId))) },
     )
 
     moving?.let { ids ->

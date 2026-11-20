@@ -67,6 +67,25 @@ class MessageActionSetTest {
     }
 
     @Test
+    fun oneMessageIsAnsweredFirstAndADraftIsEditedInstead() {
+        assertEquals(
+            listOf(UiAction.Reply, UiAction.ReplyAll, UiAction.Forward),
+            MessageActionSet.forMessage(context()).first().actions,
+        )
+        assertEquals(ActionGroup.Kind.Compose, MessageActionSet.forMessage(context()).first().kind)
+        assertEquals(
+            listOf(UiAction.EditDraft),
+            MessageActionSet.compose(ActionContext(false, false, false, false, isDraft = true)).actions,
+        )
+        assertEquals(set(context()).groups, MessageActionSet.forMessage(context()).drop(1))
+        assertFalse("a selection never offers to answer", set(context()).actions().any { it.composes })
+        listOf(UiAction.Reply, UiAction.ReplyAll, UiAction.Forward, UiAction.EditDraft).forEach {
+            assertTrue(it.composes)
+            assertNull(it.action)
+        }
+    }
+
+    @Test
     fun theSwipesArchiveToTheRightAndDeleteToTheLeft() {
         assertEquals(UiAction.Archive, MessageActionSet.swipeEnd(context()))
         assertEquals(UiAction.Delete, MessageActionSet.swipeStart(context()))

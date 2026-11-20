@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="compose_new">Compose</string>
+    <string name="compose_close">Close</string>
+    <string name="compose_send">Send</string>
+    <string name="compose_attach">Attach files</string>
+    <string name="compose_save_draft">Save draft</string>
+    <string name="compose_remove_quote">Remove quoted text</string>
+    <string name="compose_discard">Discard</string>
+    <string name="compose_from">From</string>
+    <string name="compose_subject">Subject</string>
+    <string name="compose_body">Message</string>
+    <string name="compose_cc_bcc">Cc/Bcc</string>
+    <string name="compose_remove">Remove %1$s</string>
+    <string name="compose_show_quote">Show quoted text</string>
+    <string name="compose_hide_quote">Hide quoted text</string>
+    <string name="compose_sending">Sending…</string>
+    <string name="compose_loading">Preparing…</string>
+    <string name="compose_load_failed">Could not prepare the message: %1$s</string>
+    <string name="compose_retry">Try again</string>
+    <string name="compose_recovered">Recovered unsaved text from an earlier session.</string>
+    <string name="compose_restore">Restore</string>
+    <string name="compose_dismiss">Dismiss</string>
+    <string name="compose_unrestored">Not restored: %1$s. Attach them again before sending.</string>
+    <string name="compose_discard_title">Discard this message?</string>
+    <string name="compose_discard_text">What you wrote is not kept.</string>
+    <string name="compose_keep_editing">Keep editing</string>
+    <string name="compose_not_saved_title">The draft was not saved</string>
+    <string name="compose_attachment_failed">Could not attach %1$s</string>
+    <string name="compose_sending_in">Sending in %1$ds…</string>
+    <string name="compose_undo">Undo</string>
+    <string name="compose_send_cancelled">Send cancelled</string>
+    <string name="compose_too_late">Too late — the message already sent</string>
+    <string name="compose_queued">Message queued for sending</string>
+</resources>

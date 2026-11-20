@@ -23,6 +23,7 @@ import com.frederikberg.mailverdict.kit.actions.MessageActionSet
 import com.frederikberg.mailverdict.kit.actions.MoveTarget
 import com.frederikberg.mailverdict.kit.actions.UiAction
 import com.frederikberg.mailverdict.kit.api.getAttachment
+import com.frederikberg.mailverdict.kit.compose.ComposeIntent
 import com.frederikberg.mailverdict.kit.live.OfflineNotice
 import com.frederikberg.mailverdict.kit.net.ApiError
 import com.frederikberg.mailverdict.kit.reader.ReaderAttachment
@@ -43,6 +44,7 @@ fun ReaderRoute(
     messageId: String,
     folderIds: Set<String>,
     onBack: () -> Unit,
+    onCompose: (ComposeIntent) -> Unit = {},
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -66,7 +68,14 @@ fun ReaderRoute(
     }
 
     // An action that takes the message out of its folder leaves the reader with nothing to show.
-    fun run(action: UiAction) {
+    fun run(
+        action: UiAction,
+        target: String = messageId,
+    ) {
+        ComposeIntent.answering(action, target)?.let {
+            onCompose(it)
+            return
+        }
         when (action) {
             UiAction.MoveTo -> moving = true
             UiAction.DeleteForever -> confirmForever = true
@@ -81,7 +90,15 @@ fun ReaderRoute(
             MessageWebContext(
                 serverUrl = connection.serverUrl,
                 loadResource = area.resources::load,
-                onNavigate = { open(context, it) },
+                onNavigate = {
+                    if (it is ReaderNavigation.Mailto) {
+                        onCompose(
+                            ComposeIntent(ComposeIntent.Kind.Mailto(it.url)),
+                        )
+                    } else {
+                        open(context, it)
+                    }
+                },
             )
         }
 
@@ -116,8 +133,10 @@ fun ReaderRoute(
             ReaderActions(
                 notices = area.actions.notices,
                 // Reading the state of the queue is what makes the menu follow an action just taken (Mark as unread turning into Mark as read).
-                groups = queue.let { store.actionContext(messageId)?.let(MessageActionSet::groups).orEmpty() },
-                onAction = ::run,
+                groups = queue.let { store.actionContext(messageId)?.let(MessageActionSet::forMessage).orEmpty() },
+                onAction = { run(it) },
+                answers = { id -> store.actionContext(id)?.let(MessageActionSet::compose) },
+                onAnswer = { action, id -> run(action, id) },
                 onUndo = area.actions::undo,
                 onRetryAction = { area.actions.retry(listOf(it)) },
             ),
