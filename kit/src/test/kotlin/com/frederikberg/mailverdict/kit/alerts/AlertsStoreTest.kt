@@ -235,4 +235,189 @@ class AlertsStoreTest {
             events.emit(listOf(LiveEvent(LiveInvalidation.AlertsChanged, 0)))
             withTimeout(5_000) { while (server.requestsTo("/api/alerts").size < 2) delay(20) }
         }
+
+    private fun notification(
+        id: Int,
+        account: String = "acc-1",
+        action: String = "move",
+        reverted: Boolean = false,
+    ) = """{"id":$id,"account_id":"$account","action":"$action","message_id":null,"folder_id":null,
+        |"outbox_id":null,"error":"550 mailbox full","detail":{"subject":"Quarterly report"},
+        |"acknowledged_at":null,"reverted_at":${if (reverted) "\"2026-11-14T09:00:00Z\"" else "null"},
+        |"created_at":"2026-11-14T08:00:00Z"}
+        """.trimMargin()
+
+    private fun serveNotifications(vararg notifications: String) {
+        server.script("/api/notifications", TestServer.json("[${notifications.joinToString(",")}]"))
+        server.script(
+            "/api/accounts",
+            TestServer.json(
+                """[{"id":"acc-1","name":"Private","imap_host":"h","imap_port":993,"imap_user":"u","created_at":"2026-11-14T08:00:00Z","updated_at":"2026-11-14T08:00:00Z"},
+                |{"id":"acc-2","name":"Work","imap_host":"h","imap_port":993,"imap_user":"u","created_at":"2026-11-14T08:00:00Z","updated_at":"2026-11-14T08:00:00Z"}]
+                """.trimMargin(),
+            ),
+        )
+    }
+
+    private fun noContent() =
+        mockwebserver3.MockResponse
+            .Builder()
+            .code(204)
+            .build()
+
+    @Test
+    fun aWriteFailureLandsInTheSystemTabAndCountsThere() =
+        runBlocking {
+            serve(alert("2", "outbox_stalled"))
+            serveNotifications(notification(7), notification(8, account = "acc-2", action = "send"))
+            val store = store()
+            store.load()
+            val state = store.state.value
+            assertEquals(listOf(7, 8), state.notifications.map { it.id })
+            assertEquals(3, state.systemCount)
+            assertEquals("Quarterly report", state.notifications.first().subject)
+            assertTrue(state.notifications.first().stillShownAsApplied)
+            assertEquals(
+                "true",
+                server
+                    .requestsTo("/api/notifications")
+                    .single()
+                    .url
+                    .queryParameter("unacknowledged_only"),
+            )
+            assertEquals("Work", state.accountLabel("acc-2"))
+        }
+
+    @Test
+    fun aRowNamesNoAccountWhileThePersonHasOnlyOne() =
+        runBlocking {
+            serve()
+            server.script("/api/notifications", TestServer.json("[${notification(7)}]"))
+            server.script(
+                "/api/accounts",
+                TestServer.json(
+                    """[{"id":"acc-1","name":"Private","imap_host":"h","imap_port":993,"imap_user":"u","created_at":"2026-11-14T08:00:00Z","updated_at":"2026-11-14T08:00:00Z"}]""",
+                ),
+            )
+            val store = store()
+            store.load()
+            assertNull(store.state.value.accountLabel("acc-1"))
+        }
+
+    @Test
+    fun aRevertedWriteIsNoLongerShownAsApplied() =
+        runBlocking {
+            serve()
+            serveNotifications(notification(7, reverted = true))
+            val store = store()
+            store.load()
+            assertTrue(
+                !store.state.value.notifications
+                    .single()
+                    .stillShownAsApplied,
+            )
+        }
+
+    @Test
+    fun aPostImapWithoutTheNotificationCentreLeavesTheSystemTabQuiet() =
+        runBlocking {
+            serve(alert("2", "outbox_stalled"))
+            server.script("/api/notifications", TestServer.jsonError(501, "requires PostIMAP 1.3.0"))
+            val store = store()
+            store.load()
+            assertTrue(
+                store.state.value.notifications
+                    .isEmpty(),
+            )
+            assertNull("501 is not a failure to report", store.state.value.errorMessage)
+            assertEquals(1, store.state.value.systemCount)
+        }
+
+    @Test
+    fun aFailedNotificationReadKeepsTheRowsAndSaysSo() =
+        runBlocking {
+            serve()
+            serveNotifications(notification(7))
+            val store = store()
+            store.load()
+            server.script("/api/notifications", TestServer.jsonError(500, "broken"))
+            store.load()
+            assertEquals(1, store.state.value.notifications.size)
+            assertEquals("broken", store.state.value.errorMessage)
+        }
+
+    @Test
+    fun acknowledgingHitsTheRowsAccountAndAsksTheBellAgain() =
+        runBlocking {
+            serve()
+            serveNotifications(notification(7), notification(8, account = "acc-2"))
+            val store = store()
+            store.load()
+            server.script("/api/accounts/acc-2/notifications/8/ack", noContent())
+            server.script("/api/alerts/badge", TestServer.json("""{"count":1}"""))
+            store.acknowledge(
+                store.state.value.notifications
+                    .last(),
+            )
+            assertEquals(
+                listOf(7),
+                store.state.value.notifications
+                    .map { it.id },
+            )
+            assertEquals(1, server.requestsTo("/api/accounts/acc-2/notifications/8/ack").size)
+            assertEquals(1, store.badge.value)
+        }
+
+    @Test
+    fun aRefusedAcknowledgementLeavesTheRow() =
+        runBlocking {
+            serve()
+            serveNotifications(notification(7))
+            val store = store()
+            store.load()
+            server.script("/api/accounts/acc-1/notifications/7/ack", TestServer.jsonError(500, "broken"))
+            store.acknowledge(
+                store.state.value.notifications
+                    .single(),
+            )
+            assertEquals(1, store.state.value.notifications.size)
+            assertEquals("broken", store.state.value.errorMessage)
+        }
+
+    @Test
+    fun dismissAllOnTheSystemTabAcknowledgesEveryAccountWithAFailure() =
+        runBlocking {
+            serve(alert("2", "outbox_stalled"))
+            serveNotifications(notification(7), notification(8), notification(9, account = "acc-2"))
+            val store = store()
+            store.load()
+            server.script("/api/accounts/acc-1/notifications/ack-all", noContent())
+            server.script("/api/accounts/acc-2/notifications/ack-all", noContent())
+            server.script("/api/alerts/dismiss-all", noContent())
+            store.dismissAllSystem()
+            assertEquals(1, server.requestsTo("/api/accounts/acc-1/notifications/ack-all").size)
+            assertEquals(1, server.requestsTo("/api/accounts/acc-2/notifications/ack-all").size)
+            assertEquals(1, server.requestsTo("/api/alerts/dismiss-all").size)
+            assertEquals(0, store.state.value.systemCount)
+        }
+
+    @Test
+    fun aNotificationEventRefreshesTheBell() =
+        runBlocking {
+            serve(alert("1", "mail", "m1"))
+            val store = store()
+            val events = MutableSharedFlow<List<LiveEvent>>(extraBufferCapacity = 4)
+            store.follow(events)
+            delay(100)
+            events.emit(listOf(LiveEvent(LiveInvalidation.NotificationsChanged, 0)))
+            withTimeout(5_000) { while (server.requestsTo("/api/alerts/badge").isEmpty()) delay(20) }
+            assertTrue(
+                "the list was never opened, so it is not read",
+                server.requestsTo("/api/notifications").isEmpty(),
+            )
+            serveNotifications(notification(7))
+            store.load()
+            events.emit(listOf(LiveEvent(LiveInvalidation.NotificationsChanged, 0)))
+            withTimeout(5_000) { while (server.requestsTo("/api/notifications").size < 2) delay(20) }
+        }
 }

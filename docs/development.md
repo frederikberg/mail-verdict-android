@@ -151,8 +151,20 @@ Google's push service (`NativePushController`, `:kit`, `push/`) is the registrat
 - A `background` push is the server asking the phone to withdraw notifications of alerts read
   elsewhere: `staleAlertIds` asks `POST /api/alerts/lookup` which of the shown ones are gone or
   dismissed, and `resolved` ids inside an alert withdraw theirs directly.
+- The app also withdraws stale banners itself: `withdrawOnAlertChanges` runs the same lookup whenever
+  the live stream reports an alert change or a resync while signed in, and `MainActivity.onStart` runs
+  it each time the app comes to the front. A phone on the helper-app path (Web Push) gets only these
+  triggers, because the server sends it no background push and no resolved ids.
 - Google's service starts only when notifications are turned on (`firebase_messaging_auto_init_enabled`
   is off in the manifest), so a phone that never does contacts nobody.
+
+The alert list's System tab holds every non-mail alert and the writes PostIMAP gave up on
+(`GET /api/notifications?unacknowledged_only=true`, merged by `AlertsStore`). Acknowledging goes to the
+row's own account (`POST /api/accounts/{id}/notifications/{n}/ack`, or `ack-all` per account for
+Dismiss all), and the server announces both a new row and an acknowledgement as `notification.new`,
+which refreshes the lists and the bell. The bell's number stays the server's own count
+(`GET /api/alerts/badge`), which includes these rows. A `501` from the list means the connected PostIMAP
+is older than 1.3.0 and the tab shows alerts only.
 
 The Firebase project configuration is not in the repository. A build that has `app/google-services.json`
 applies the Google services plugin and uses Google's push service where it can; one without compiles and

@@ -20,7 +20,8 @@ import com.frederikberg.mailverdict.kit.push.PushRegistrar
 import com.frederikberg.mailverdict.kit.push.PushRelayClient
 import com.frederikberg.mailverdict.kit.push.PushSession
 import com.frederikberg.mailverdict.kit.push.SealedFileNativePushRecordStore
-import com.frederikberg.mailverdict.kit.push.staleAlertIds
+import com.frederikberg.mailverdict.kit.push.withdrawOnAlertChanges
+import com.frederikberg.mailverdict.kit.push.withdrawStaleNotifications
 import com.frederikberg.mailverdict.kit.session.ConnectionStores
 import com.frederikberg.mailverdict.kit.session.InMemoryServerAddressStore
 import com.frederikberg.mailverdict.kit.session.SessionController
@@ -42,6 +43,7 @@ import com.frederikberg.mailverdict.push.UnifiedPushPlatform
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -78,14 +80,37 @@ class AppGraph private constructor(
     val nativePush: NativePushController?,
     /** A destination a notification tap asked for, until a screen has shown it. */
     val deepLinks: DeepLinks,
+    private val ownNotifier: PushNotifier,
 ) {
     /** Withdraws the notifications of alerts the server says were read or dismissed elsewhere. */
     suspend fun readSync(notifier: PushNotifier) {
         val connection = (session.state.value as? SessionState.SignedIn)?.connection ?: return
         try {
-            staleAlertIds(connection.api, notifier.shownTags()).forEach(notifier::cancel)
+            withdrawStaleNotifications(connection.api, notifier)
         } catch (e: ApiError) {
             Timber.w("read-sync lookup failed: %s", e.userMessage)
+        }
+    }
+
+    /** Coming to the front: mail read elsewhere while the app was away leaves no banner behind. */
+    fun readSyncOnForeground() {
+        appScope.launch { readSync(ownNotifier) }
+    }
+
+    /**
+     * While signed in, the stream's alert changes and resyncs withdraw stale banners, so mail read on
+     * the web or inside the app takes its notification with it. A phone on the helper-app path gets
+     * this too, but only while the app is open: the server withdraws through Google's service alone.
+     */
+    private fun withdrawWhileSignedIn() {
+        appScope.launch {
+            session.state.collectLatest { state ->
+                val connection = (state as? SessionState.SignedIn)?.connection ?: return@collectLatest
+                withdrawOnAlertChanges(
+                    connection.liveEventHub.events,
+                    onFailure = { Timber.w("read-sync lookup failed: %s", it.userMessage) },
+                ) { withdrawStaleNotifications(connection.api, ownNotifier) }
+            }
         }
     }
 
@@ -165,7 +190,8 @@ class AppGraph private constructor(
                 wiring.unifiedPush,
                 wiring.native,
                 DeepLinks(),
-            )
+                PushNotifier(context.applicationContext),
+            ).also { if (!fixtureMode) it.withdrawWhileSignedIn() }
         }
 
         /** The notification path chosen for this start, with the objects of the one that was. */

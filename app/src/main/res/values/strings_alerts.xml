@@ -8,6 +8,15 @@
     <string name="alerts_empty_mail">No new mail alerts.</string>
     <string name="alerts_empty_system">Nothing needs your attention.</string>
     <string name="alerts_error">Could not load alerts: %1$s</string>
+    <string name="alerts_notification_failed">%1$s failed</string>
+    <string name="alerts_notification_subject">“%1$s”</string>
+    <string name="alerts_notification_still_applied">Our value is still shown as applied — the server never got it.</string>
+    <string name="alerts_action_flag_add">Setting a flag</string>
+    <string name="alerts_action_flag_remove">Clearing a flag</string>
+    <string name="alerts_action_move">Moving a message</string>
+    <string name="alerts_action_delete">Deleting a message</string>
+    <string name="alerts_action_send">Sending a message</string>
+    <string name="alerts_action_draft">Saving a draft</string>
     <string name="alerts_push_banner">Notifications are off on this phone.</string>
     <string name="alerts_push_banner_action">Set up</string>
 </resources>

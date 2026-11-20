@@ -14890,6 +14890,28 @@
         ]
       }
     },
+    "/me/sign-ins/current/revoke": {
+      "post": {
+        "description": "Sign out the phone or browser making this request, and delete the\npush subscriptions registered under it: what a phone app calls at\nsign-out, while it still holds its token. Its next request is refused.\n400 for a machine client, whose subject would stay refused for good --\nan access key is signed out from the list or by an admin.",
+        "operationId": "revoke_current_sign_in_me_sign_ins_current_revoke_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Revoke Current Sign In",
+        "tags": [
+          "sign-ins"
+        ]
+      }
+    },
     "/me/sign-ins/{sign_in_id}/revoke": {
       "post": {
         "description": "Revoke one of the caller's sign-ins -- the current one included,\nwhose next request is then refused. 403 for someone else's.",
