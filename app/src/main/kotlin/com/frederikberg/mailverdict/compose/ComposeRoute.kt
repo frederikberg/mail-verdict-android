@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.frederikberg.mailverdict.AppGraph
@@ -29,6 +30,7 @@ fun ComposeRoute(
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val area = remember(connection) { graph.composeArea(connection) }
     val store = remember(area, intent) { area.composer(intent) }
     val scope = rememberCoroutineScope()
@@ -47,7 +49,7 @@ fun ComposeRoute(
                     }
                 store.addAttachments(read.mapNotNull { it.second })
                 read.filter { it.second == null }.forEach { (uri, _) ->
-                    area.notify(context.getString(R.string.compose_attachment_failed, uri.lastPathSegment.orEmpty()))
+                    area.notify(resources.getString(R.string.compose_attachment_failed, uri.lastPathSegment.orEmpty()))
                 }
             }
         }
