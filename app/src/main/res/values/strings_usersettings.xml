@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_group_your_mail">Your mail</string>
+    <string name="settings_row_rules">Rules</string>
+    <string name="settings_row_rules_text">What happens to your mail as it arrives</string>
+    <string name="settings_row_mail">Mail settings</string>
+    <string name="settings_row_mail_text">Filing, notifications, sending</string>
+    <string name="settings_row_signins">Signed-in devices</string>
+    <string name="settings_row_signins_text">Phones, browsers and access keys</string>
+    <string name="usersettings_title">Mail settings</string>
+    <string name="usersettings_error">Could not load your settings: %1$s</string>
+    <string name="usersettings_retry">Try again</string>
+    <string name="usersettings_empty">The server did not return any settings for you.</string>
+    <string name="usersettings_suffix_days">days</string>
+    <string name="mailboxes_accounts_row">Accounts</string>
+    <string name="mailboxes_add_account">Add an account</string>
+</resources>

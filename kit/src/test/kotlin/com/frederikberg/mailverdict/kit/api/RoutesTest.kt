@@ -1,15 +1,22 @@
 package com.frederikberg.mailverdict.kit.api
 
+import com.frederikberg.mailverdict.contract.AccountCreateRequest
+import com.frederikberg.mailverdict.contract.AccountUpdateRequest
 import com.frederikberg.mailverdict.contract.BulkActionKind
 import com.frederikberg.mailverdict.contract.BulkActionRequest
+import com.frederikberg.mailverdict.contract.IdentityCreate
+import com.frederikberg.mailverdict.contract.IdentityUpdate
 import com.frederikberg.mailverdict.contract.MessageActionKind
 import com.frederikberg.mailverdict.contract.MessageActionRequest
 import com.frederikberg.mailverdict.contract.NativeSubscriptionCreate
 import com.frederikberg.mailverdict.contract.OutboxCreateRequest
+import com.frederikberg.mailverdict.contract.PipelineWriteRequest
 import com.frederikberg.mailverdict.contract.PushChannel
 import com.frederikberg.mailverdict.contract.PushSubscriptionCreate
 import com.frederikberg.mailverdict.contract.PushSubscriptionKeys
 import com.frederikberg.mailverdict.contract.PushSubscriptionUpdate
+import com.frederikberg.mailverdict.contract.StageReorderRequest
+import com.frederikberg.mailverdict.contract.StageUpdateRequest
 import com.frederikberg.mailverdict.kit.auth.AuthMode
 import com.frederikberg.mailverdict.kit.net.ApiClient
 import com.frederikberg.mailverdict.kit.net.ApiError
@@ -19,8 +26,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.junit.Assert.assertTrue
@@ -158,6 +167,56 @@ class RoutesTest {
         call { api.acknowledgeAllNotifications(id) }
         call { api.listOwnSignIns() }
         call { api.revokeOwnSignIn(id) }
+        call {
+            api.createAccount(
+                AccountCreateRequest(name = "n", imapHost = "h", imapUser = "u", trashRetentionDays = 30),
+            )
+        }
+        call {
+            api.updateAccount(
+                id,
+                AccountUpdateRequest(name = "n", trashRetentionDays = AccountUpdateRequest.days(null)),
+            )
+        }
+        call { api.deleteAccount(id) }
+        call { api.setAccountEmoji(id, "🏠") }
+        call { api.createIdentity(IdentityCreate(id, "a@example.com", "A", true)) }
+        call { api.updateIdentity(id, IdentityUpdate(isDefault = true)) }
+        call { api.deleteIdentity(id) }
+        call { api.getSettings("mail") }
+        call { api.updateSettings("mail", buildJsonObject { put("show_folder_totals", true) }) }
+        call { api.getSettingsSchema() }
+        call { api.getPipeline() }
+        call { api.replacePipeline(PipelineWriteRequest(enabled = false, stages = emptyList(), baseRevision = 1)) }
+        call { api.getPipelineHealth() }
+        call { api.updateStage("s", StageUpdateRequest(enabled = true)) }
+        call { api.deleteStage("s", 2) }
+        call { api.reorderStages(StageReorderRequest(listOf("a", "b"), 2)) }
+        call { api.listPipelineRevisions() }
+        call { api.restorePipelineRevision(3) }
+        call { api.createAccount(AccountCreateRequest(name = "n", imapHost = "h", imapUser = "u")) }
+        call {
+            api.updateAccount(
+                id,
+                AccountUpdateRequest(name = "n", trashRetentionDays = AccountUpdateRequest.days(null)),
+            )
+        }
+        call { api.deleteAccount(id) }
+        call { api.setAccountEmoji(id, "📬") }
+        call { api.createIdentity(IdentityCreate(id, "a@example.com", "A", isDefault = true)) }
+        call { api.updateIdentity(id, IdentityUpdate(isDefault = true)) }
+        call { api.deleteIdentity(id) }
+        call { api.getSettings("mail") }
+        call { api.updateSettings("outbox", buildJsonObject { put("undo_send_seconds", 10) }) }
+        call { api.getSettingsSchema() }
+        call { api.getPipeline() }
+        call { api.replacePipeline(PipelineWriteRequest(enabled = false, stages = emptyList(), baseRevision = 1)) }
+        call { api.getPipelineHealth() }
+        call { api.updateStage("rule", StageUpdateRequest(enabled = false)) }
+        call { api.deleteStage("rule", 1) }
+        call { api.reorderStages(StageReorderRequest(listOf("rule"), 1)) }
+        call { api.listPipelineRevisions() }
+        call { api.restorePipelineRevision(1) }
         call { api.deletePushSubscription(id) }
         call { api.sendTestPush(id) }
         call { api.createOutbox(OutboxCreateRequest(accountId = id, kind = "send", to = listOf("a@example.com"))) }

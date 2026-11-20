@@ -7,8 +7,8 @@
 Native Android client for [MailVerdict](https://github.com/frederikberg/mail-verdict), a
 self-hosted mail client with an AI spam layer. Your mail, folders and the spam verdicts of your own
 server in a phone-sized app: a message list that holds still while mail arrives, a reader, swipes
-and a selection for triage, a composer for new mail, replies, forwards and drafts, and notifications
-with or without Google services.
+and a selection for triage, a composer for new mail, replies, forwards and drafts, notifications
+with or without Google services, and the screens for accounts, rules, settings and signed-in devices.
 
 <p align="center"><img src="docs/images/maillist.png" alt="An inbox of mixed mail: a conversation with an attachment, a flagged newsletter, a message marked as spam, one with no subject" width="40%"></p>
 

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rules_title">Rules</string>
+    <string name="rules_intro">What happens to your mail as it arrives. Rules run from top to bottom; a rule marked stop ends the list for that mail.</string>
+    <string name="rules_menu">More rule actions</string>
+    <string name="rules_history">History</string>
+    <string name="rules_pause">Pause all rules</string>
+    <string name="rules_resume">Resume rules</string>
+    <string name="rules_paused_banner">Your rules are paused: nothing acts on your incoming mail.</string>
+    <string name="rules_resume_button">Resume</string>
+    <string name="rules_pause_title">Pause all rules?</string>
+    <string name="rules_pause_text">Nothing will act on your incoming mail until you resume. Mail that arrives meanwhile is not processed afterwards.</string>
+    <string name="rules_pause_confirm">Pause rules</string>
+    <string name="rules_features_title">Automatic features</string>
+    <string name="rules_features_text">Per account. Spam the model flags is moved to Junk; which model reads your mail is set by the administrator.</string>
+    <string name="rules_features_none">No accounts yet. Add one, then switch these on here.</string>
+    <string name="rules_feature_spam">Spam detection</string>
+    <string name="rules_feature_orders">Orders and tickets</string>
+    <string name="rules_filter">Filter by name or what it does</string>
+    <string name="rules_empty">No rules yet. Describe or add one on the web.</string>
+    <string name="rules_no_match">No rule matches “%1$s”.</string>
+    <string name="rules_group_count">%1$s · %2$d</string>
+    <string name="rules_stop">stop</string>
+    <string name="rules_permanent">permanent</string>
+    <string name="rules_if">If</string>
+    <string name="rules_actions">Actions for %1$s</string>
+    <string name="rules_move_up">Move up</string>
+    <string name="rules_move_down">Move down</string>
+    <string name="rules_delete">Delete</string>
+    <string name="rules_delete_title">Delete “%1$s”?</string>
+    <string name="rules_delete_text">Removes this rule from your list. Mail already processed keeps what it was given; nothing is undone.</string>
+    <string name="rules_error">Could not load your rules: %1$s</string>
+    <string name="rules_retry">Try again</string>
+    <string name="rules_history_title">Rule history</string>
+    <string name="rules_history_empty">No earlier versions.</string>
+    <string name="rules_history_current">current</string>
+    <string name="rules_history_restore">Restore</string>
+    <string name="rules_history_note_none">No note</string>
+    <string name="rules_history_item">Version %1$d</string>
+    <string name="rules_restore_title">Restore version %1$d?</string>
+    <string name="rules_restore_text">Your rules become what they were then. The current list stays in the history.</string>
+    <string name="rules_close">Close</string>
+</resources>

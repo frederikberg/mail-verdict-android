@@ -1,11 +1,13 @@
 package com.frederikberg.mailverdict.mailboxes
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import com.frederikberg.mailverdict.kit.auth.AuthMode
 import com.frederikberg.mailverdict.kit.fixtures.FixtureInterceptor
 import com.frederikberg.mailverdict.kit.fixtures.Fixtures
@@ -68,6 +70,7 @@ class MailboxesScreenTest {
                     onOpenFolder = { opened += "folder:${it.displayName}" },
                     onOpenUnified = { opened += "unified:${it.name}" },
                     onOpenSettings = { opened += "settings" },
+                    onOpenAccounts = { opened += "accounts" },
                 )
             }
         }
@@ -204,5 +207,25 @@ class MailboxesScreenTest {
             )
 
         assertEquals(true, row.isGlacier)
+    }
+
+    @Test
+    fun theAccountsRowAtTheEndOpensTheAccounts() {
+        show(fixtureState())
+
+        compose.onNodeWithTag(MailboxesTags.LIST).performScrollToNode(hasTestTag(MailboxesTags.ACCOUNTS))
+        compose.onNodeWithTag(MailboxesTags.ACCOUNTS).performClick()
+
+        assertEquals(listOf("accounts"), opened)
+    }
+
+    @Test
+    fun withNoAccountTheRowInvitesAddingOne() {
+        show(MailboxesState(hasAnyAccount = false))
+
+        compose.onNodeWithText("Add an account").assertIsDisplayed()
+        compose.onNodeWithTag(MailboxesTags.ACCOUNTS).performClick()
+
+        assertEquals(listOf("accounts"), opened)
     }
 }

@@ -39,6 +39,9 @@ class SettingsScreenTest {
                     onTheme = { calls += "theme:$it" },
                     onSignOut = { calls += "sign-out" },
                     onBack = { calls += "back" },
+                    onOpenRules = { calls += "rules" },
+                    onOpenMailSettings = { calls += "mail-settings" },
+                    onOpenSignIns = { calls += "sign-ins" },
                 )
             }
         }
@@ -101,5 +104,16 @@ class SettingsScreenTest {
 
         assertEquals(emptyList<String>(), calls)
         compose.onNodeWithText("Sign out?").assertDoesNotExist()
+    }
+
+    @Test
+    fun theRowsOpenRulesMailSettingsAndTheSignedInDevices() {
+        show()
+
+        compose.onNodeWithTag(SettingsTags.RULES).performClick()
+        compose.onNodeWithTag(SettingsTags.MAIL_SETTINGS).performClick()
+        compose.onNodeWithTag(SettingsTags.SIGN_INS).performClick()
+
+        assertEquals(listOf("rules", "mail-settings", "sign-ins"), calls)
     }
 }

@@ -45,12 +45,14 @@ import com.frederikberg.mailverdict.kit.stores.mailboxes.MailboxesFolderRow
 import com.frederikberg.mailverdict.kit.stores.mailboxes.MailboxesState
 import com.frederikberg.mailverdict.kit.stores.mailboxes.MailboxesSupport
 import com.frederikberg.mailverdict.kit.stores.mailboxes.MailboxesUnifiedRow
+import com.frederikberg.mailverdict.ui.NavigationRow
 import com.frederikberg.mailverdict.ui.OfflineCapsule
 
 object MailboxesTags {
     const val LIST = "mailboxes-list"
     const val SETTINGS = "mailboxes-settings"
     const val SEARCH = "mailboxes-search"
+    const val ACCOUNTS = "mailboxes-accounts"
 
     fun folder(id: String) = "folder:$id"
 
@@ -78,6 +80,7 @@ fun MailboxesScreen(
     alertBadge: Int = 0,
     onOpenSearch: () -> Unit = {},
     onOpenAlerts: () -> Unit = {},
+    onOpenAccounts: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -113,6 +116,21 @@ fun MailboxesScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
+                    }
+                    item(key = "accounts-row") {
+                        HorizontalDivider()
+                        NavigationRow(
+                            stringResource(
+                                if (state.hasAnyAccount) {
+                                    R.string.mailboxes_accounts_row
+                                } else {
+                                    R.string.mailboxes_add_account
+                                },
+                            ),
+                            null,
+                            onOpenAccounts,
+                            Modifier.testTag(MailboxesTags.ACCOUNTS),
+                        )
                     }
                 }
             }
