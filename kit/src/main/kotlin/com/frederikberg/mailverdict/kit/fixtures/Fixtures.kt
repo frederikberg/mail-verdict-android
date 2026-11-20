@@ -99,5 +99,5 @@ object Fixtures {
                 {"id":"00000000-0000-4000-8000-0000000006a1","account_id":"$PRIVATE_ACCOUNT","kind":"send","status":"pending",
                  "to":[],"attachments":[],"created_at":"2026-11-14T09:00:00+00:00","updated_at":"2026-11-14T09:00:00+00:00"}
                 """.trimIndent(),
-        ) + MailFixtures.routes
+        ) + MailFixtures.routes + AccountFixtures.routes
 }

@@ -36,10 +36,14 @@ import androidx.compose.ui.unit.dp
 import com.frederikberg.mailverdict.R
 import com.frederikberg.mailverdict.contract.MeResponse
 import com.frederikberg.mailverdict.platform.ThemeChoice
+import com.frederikberg.mailverdict.ui.NavigationRow
 
 object SettingsTags {
     const val SIGN_OUT = "settings-sign-out"
     const val CONFIRM_SIGN_OUT = "settings-sign-out-confirm"
+    const val RULES = "settings-rules"
+    const val MAIL_SETTINGS = "settings-mail"
+    const val SIGN_INS = "settings-sign-ins"
 }
 
 /** Theme, who is signed in to which server, sign-out, and the app's version. Each choice applies at once; nothing here has a Save button. */
@@ -53,6 +57,9 @@ fun SettingsScreen(
     onTheme: (ThemeChoice) -> Unit,
     onSignOut: () -> Unit,
     onBack: () -> Unit,
+    onOpenRules: () -> Unit,
+    onOpenMailSettings: () -> Unit,
+    onOpenSignIns: () -> Unit,
 ) {
     var confirming by rememberSaveable { mutableStateOf(false) }
     Scaffold(
@@ -92,6 +99,29 @@ fun SettingsScreen(
                         ) { Text(stringResource(label)) }
                     }
                 }
+            }
+            Section(R.string.settings_group_your_mail) {
+                NavigationRow(
+                    stringResource(R.string.settings_row_rules),
+                    stringResource(R.string.settings_row_rules_text),
+                    onOpenRules,
+                    Modifier.testTag(SettingsTags.RULES),
+                    horizontalPadding = 0.dp,
+                )
+                NavigationRow(
+                    stringResource(R.string.settings_row_mail),
+                    stringResource(R.string.settings_row_mail_text),
+                    onOpenMailSettings,
+                    Modifier.testTag(SettingsTags.MAIL_SETTINGS),
+                    horizontalPadding = 0.dp,
+                )
+                NavigationRow(
+                    stringResource(R.string.settings_row_signins),
+                    stringResource(R.string.settings_row_signins_text),
+                    onOpenSignIns,
+                    Modifier.testTag(SettingsTags.SIGN_INS),
+                    horizontalPadding = 0.dp,
+                )
             }
             Section(R.string.settings_connection) {
                 Line(R.string.settings_server, serverUrl)

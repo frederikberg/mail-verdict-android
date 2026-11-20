@@ -31,6 +31,7 @@ fun MailboxesRoute(
     alertBadge: Int = 0,
     onOpenSearch: () -> Unit = {},
     onOpenAlerts: () -> Unit = {},
+    onOpenAccounts: () -> Unit = {},
 ) {
     val store =
         remember(connection) {
@@ -67,5 +68,6 @@ fun MailboxesRoute(
         alertBadge = alertBadge,
         onOpenSearch = onOpenSearch,
         onOpenAlerts = onOpenAlerts,
+        onOpenAccounts = onOpenAccounts,
     )
 }

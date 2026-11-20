@@ -139,6 +139,39 @@ back the next time the same composer opens. A send the server holds for its undo
 `UndoSendStore`, which the capsule over the navigation shows until the window passes; Undo cancels it
 and reopens the composer with what it held. Tests drive both in virtual time.
 
+## Accounts, rules and settings
+
+The stores are in `:kit` (`accounts/`, `rules/`, `settings/`, `signins/`), the screens in `:app` under
+the same names, each as a `Route` (a store wired to the screen) and a stateless `Screen`. The mailbox
+overview ends in an Accounts row, and Settings holds the rows for Rules, Mail settings and Signed-in
+devices.
+
+- **Add account.** `AccountPresets` carries the Gmail and iCloud presets of the web (servers, how the
+  IMAP name follows from the address, the app-password pages) and `AccountForm` turns the form into
+  the `POST /api/accounts` body: a preset asks only for an address and an app password, any other
+  server for the full connection. A refusal from the server is shown under the button with the
+  typed text kept; passwords are never written into saved instance state.
+- **Accounts and identities.** The list shows each account with its state and last sync; the detail
+  switches sync, spam detection and orders, changes the emoji, syncs now, deletes, and lists the
+  account's sending identities (add, make default, remove). The edit form changes everything the web's
+  edit form does except the IMAP host, port and user, which the server fixes at creation.
+  `PATCH /accounts/{id}` clears a retention or the glacier sweep only from an explicit `null`, which
+  `AccountUpdateRequest.days` writes on the wire.
+- **Rules.** A rule is a stage of the person's pipeline document. The list is grouped like the web's
+  (Spam, Filing, Forwarding, Orders & tickets), each rule one sentence (`RuleSummaries.describe`, the web's
+  `describeRule` with its test cases), with a switch, move up and down inside its group, delete behind
+  a confirmation, the folder warnings from `GET /pipeline/health`, pause and resume of the whole list,
+  and the history with restore. Per-account spam and orders switches sit above the list. Writing or
+  editing a rule, the rule assistant and the test dialogs are on the web. Pausing sends the whole
+  document back, since `PUT /pipeline` reads an omitted stage list as empty.
+- **Mail settings.** The settings every person has their own value of (`UserSettingsCatalog`: filing,
+  notifications, undo send, orders) are written the moment they change and put back if the server
+  refuses. A user-scoped key the server returns that no field names is shown as a plain control, from
+  `GET /settings/schema`. The orders filter, a block of JSON, is edited on the web.
+- **Signed-in devices.** `GET /me/sign-ins` with the current sign-in marked. Signing out another one is
+  `POST /me/sign-ins/{id}/revoke`; signing out the current one is the session's own sign-out, with its
+  cleanup, never a request of its own.
+
 ## Search, alerts and notifications
 
 Search keeps its logic in `:kit` (`search/`): `SearchStore` debounces typing, cancels what a newer

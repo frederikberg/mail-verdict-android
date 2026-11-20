@@ -95,6 +95,31 @@ sealed interface Route {
         val pendingSendId: String? = null,
         val mailto: String? = null,
     ) : Route
+
+    @Serializable
+    data object Accounts : Route
+
+    @Serializable
+    data object AddAccount : Route
+
+    @Serializable
+    data class Account(
+        val accountId: String,
+    ) : Route
+
+    @Serializable
+    data class EditAccount(
+        val accountId: String,
+    ) : Route
+
+    @Serializable
+    data object Rules : Route
+
+    @Serializable
+    data object MailSettings : Route
+
+    @Serializable
+    data object SignIns : Route
 }
 
 @Composable
@@ -166,6 +191,7 @@ fun AppNavigation(
                     alertBadge = alertBadge,
                     onOpenSearch = { navController.navigate(Route.Search()) },
                     onOpenAlerts = { navController.navigate(Route.Alerts) },
+                    onOpenAccounts = { navController.navigate(Route.Accounts) },
                 )
             }
             composable<Route.Settings> {
@@ -179,8 +205,12 @@ fun AppNavigation(
                     onTheme = graph.preferences::setTheme,
                     onSignOut = onSignOut,
                     onBack = { navController.popBackStack() },
+                    onOpenRules = { navController.navigate(Route.Rules) },
+                    onOpenMailSettings = { navController.navigate(Route.MailSettings) },
+                    onOpenSignIns = { navController.navigate(Route.SignIns) },
                 )
             }
+            accountDestinations(graph, connection, navController, onSignOut)
             composable<Route.Search> { entry ->
                 val route = entry.toRoute<Route.Search>()
                 SearchRoute(

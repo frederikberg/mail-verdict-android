@@ -30,6 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   and Undo reopens the composer with everything it held.
 - Attachments from the system file picker, sent with the message; a forward carries the original's
   files along.
+- Accounts: the list of the person's accounts from the mailbox overview, an account's detail (state, last
+  sync, sync now, sync, spam and orders switches, emoji, delete) with its sending identities, and an
+  edit form. The add-account form fills in the web's Gmail and iCloud presets, or takes any IMAP and
+  SMTP server.
+- Rules: the person's rules as sentences in the web's groups, with a switch, move up and down, delete,
+  folder warnings, pause all rules, the version history with restore, and the per-account spam and
+  orders switches.
+- Mail settings: the settings each person has their own value of (filing, notifications, undo send,
+  orders), written as they change.
+- Signed-in devices: the person's phones, browsers and access keys with the current one marked, each
+  signed out from the list; signing out the current one is the usual sign-out.
 
 ### Changed
 

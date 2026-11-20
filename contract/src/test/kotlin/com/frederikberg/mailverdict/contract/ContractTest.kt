@@ -80,11 +80,24 @@ class ContractTest {
             "NotificationResponse" to NotificationResponse.serializer(),
             "SignInResponse" to SignInResponse.serializer(),
             "ContactSearchHitOut" to ContactSearchHitOut.serializer(),
+            "AccountCreateRequest" to AccountCreateRequest.serializer(),
+            "AccountUpdateRequest" to AccountUpdateRequest.serializer(),
+            "EmojiUpdate" to EmojiUpdate.serializer(),
+            "IdentityCreate" to IdentityCreate.serializer(),
+            "IdentityUpdate" to IdentityUpdate.serializer(),
+            "SettingsUpdateRequest" to SettingsUpdateRequest.serializer(),
+            "StageOut" to StageOut.serializer(),
+            "PipelineHealthEntryOut" to PipelineHealthEntryOut.serializer(),
+            "PipelineDocumentOut" to PipelineDocumentOut.serializer(),
+            "PipelineWriteRequest" to PipelineWriteRequest.serializer(),
+            "StageReorderRequest" to StageReorderRequest.serializer(),
+            "StageUpdateRequest" to StageUpdateRequest.serializer(),
+            "PipelineRevisionSummary" to PipelineRevisionSummary.serializer(),
         )
 
     /** Models the published schema cannot check: no schema of their own, or not a model at all. */
     private val unchecked: Set<String> =
-        setOf("HealthResponse", "OutboxCreateRequest", "AddressList", "AddressListSerializer")
+        setOf("HealthResponse", "OutboxCreateRequest", "AddressList", "AddressListSerializer", "SettingSchemaEntry")
 
     /** Each wire enumeration beside the schema property that lists its values: `Schema.property`. */
     private val enums: Map<String, Set<String>> =

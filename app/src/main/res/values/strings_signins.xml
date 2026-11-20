@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="signins_title">Signed-in devices</string>
+    <string name="signins_intro">Every phone and access key that has used your account, and your web browsers together. Signing one out takes effect on its next request.</string>
+    <string name="signins_empty">Nothing has signed in yet.</string>
+    <string name="signins_error">Could not load your sign-ins: %1$s</string>
+    <string name="signins_retry">Try again</string>
+    <string name="signins_this_one">this one</string>
+    <string name="signins_signed_out">signed out</string>
+    <string name="signins_last_used">Last used %1$s</string>
+    <string name="signins_signed_out_at">Signed out %1$s</string>
+    <string name="signins_first_seen">First seen %1$s</string>
+    <string name="signins_sign_out">Sign out</string>
+    <string name="signins_confirm_title">Sign out %1$s?</string>
+</resources>
