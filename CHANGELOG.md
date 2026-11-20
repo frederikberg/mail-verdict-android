@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- The alerts System tab lists the writes PostIMAP gave up on, a send that never left included, with the
+  server's wording (what failed, the message subject, the error, and a note while the app still shows
+  the change as applied), the account when there are several, each dismissable and covered by Dismiss
+  all. The bell count refreshes when the stream announces a notification.
+- A notification of mail read elsewhere is withdrawn when the app comes to the front and when the
+  stream reports a dismissal or a resync, not only when Google's push service asks for it. A phone on
+  the helper-app path gets this while the app is open and not in the background.
+
+### Changed
+
+- The vendored API contract is synced to MailVerdict 9.3.1.
+
 ## [0.3.0] - 2026-11-14
 
 ### Changed

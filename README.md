@@ -85,6 +85,8 @@ A debug build started with `--ez fixture_mode true` shows canned data instead of
 - No compose or reply yet, no calendar or contacts, no orders screens, no widgets.
 - Moving a message into a glacier is not offered; moves across accounts in one selection are not
   supported.
+- A phone using a UnifiedPush helper app keeps a notification of mail read elsewhere until the app is
+  opened: the server withdraws those through Google's push service only.
 - The app is not in Google Play.
 
 ## Docs

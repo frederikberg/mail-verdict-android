@@ -16,11 +16,12 @@ import com.frederikberg.mailverdict.R
 import com.frederikberg.mailverdict.contract.PushChannel
 import com.frederikberg.mailverdict.kit.push.PushPayload
 import com.frederikberg.mailverdict.kit.push.PushTarget
+import com.frederikberg.mailverdict.kit.push.ShownNotifications
 
 /** Turns a push payload into a system notification, and a tap on it back into a [PushTarget]. */
 class PushNotifier(
     private val context: Context,
-) {
+) : ShownNotifications {
     private val manager = NotificationManagerCompat.from(context)
 
     fun createChannels() {
@@ -72,10 +73,10 @@ class PushNotifier(
     }
 
     /** Withdraws the notification of an alert that was read in the app. */
-    fun cancel(alertId: String) = manager.cancel(alertId, NOTIFICATION_ID)
+    override fun cancel(alertId: String) = manager.cancel(alertId, NOTIFICATION_ID)
 
     /** The tags of the notifications on screen, which for an alert are its id. */
-    fun shownTags(): List<String> =
+    override fun shownTags(): List<String> =
         context
             .getSystemService(NotificationManager::class.java)
             .activeNotifications

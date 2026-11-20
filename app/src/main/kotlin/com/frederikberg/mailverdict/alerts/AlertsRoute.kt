@@ -59,6 +59,7 @@ fun AlertsRoute(
                 onDismissAll = { system ->
                     scope.launch { if (system) store.dismissAllSystem() else store.dismissAllMail() }
                 },
+                onAcknowledge = { notification -> scope.launch { store.acknowledge(notification) } },
                 onOpenPushSettings = onOpenPushSettings,
             ),
     )

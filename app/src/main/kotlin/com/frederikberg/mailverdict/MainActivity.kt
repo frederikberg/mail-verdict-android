@@ -68,6 +68,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         graph.session.onForeground()
+        graph.readSyncOnForeground()
     }
 
     override fun onStop() {

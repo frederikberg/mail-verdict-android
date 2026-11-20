@@ -153,6 +153,9 @@ class RoutesTest {
             )
         }
         call { api.lookupAlerts(listOf(id)) }
+        call { api.listNotifications(unacknowledgedOnly = true, limit = 500) }
+        call { api.acknowledgeNotification(id, 7) }
+        call { api.acknowledgeAllNotifications(id) }
         call { api.listOwnSignIns() }
         call { api.revokeOwnSignIn(id) }
         call { api.deletePushSubscription(id) }

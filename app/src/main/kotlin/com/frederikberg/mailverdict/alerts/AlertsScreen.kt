@@ -43,7 +43,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.frederikberg.mailverdict.R
 import com.frederikberg.mailverdict.contract.AlertResponse
+import com.frederikberg.mailverdict.contract.NotificationResponse
 import com.frederikberg.mailverdict.kit.alerts.AlertsState
+import com.frederikberg.mailverdict.kit.alerts.stillShownAsApplied
+import com.frederikberg.mailverdict.kit.alerts.subject
 import com.frederikberg.mailverdict.kit.search.SearchRowFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -62,6 +65,10 @@ object AlertsTags {
     fun row(id: String) = "alert:$id"
 
     fun dismiss(id: String) = "alert-dismiss:$id"
+
+    fun notification(id: Int) = "notification:$id"
+
+    fun acknowledge(id: Int) = "notification-ack:$id"
 }
 
 class AlertsCallbacks(
@@ -69,6 +76,7 @@ class AlertsCallbacks(
     val onOpen: (AlertResponse) -> Unit,
     val onDismiss: (AlertResponse) -> Unit,
     val onDismissAll: (system: Boolean) -> Unit,
+    val onAcknowledge: (NotificationResponse) -> Unit,
     val onOpenPushSettings: () -> Unit,
 )
 
@@ -111,8 +119,8 @@ fun AlertsScreen(
                     }
                 },
                 actions = {
-                    val list = if (tab == 0) state.mailAlerts else state.systemAlerts
-                    if (list.isNotEmpty()) {
+                    val count = if (tab == 0) state.mailAlerts.size else state.systemCount
+                    if (count > 0) {
                         TextButton(
                             onClick = { callbacks.onDismissAll(tab == 1) },
                             modifier = Modifier.testTag(AlertsTags.DISMISS_ALL),
@@ -158,7 +166,7 @@ fun AlertsScreen(
                 Tab(
                     selected = tab == 1,
                     onClick = { tab = 1 },
-                    text = { Text(stringResource(R.string.alerts_tab_system, state.systemAlerts.size)) },
+                    text = { Text(stringResource(R.string.alerts_tab_system, state.systemCount)) },
                     modifier = Modifier.testTag(AlertsTags.TAB_SYSTEM),
                 )
             }
@@ -169,14 +177,14 @@ fun AlertsScreen(
                     modifier = Modifier.padding(16.dp),
                 )
             }
-            val list = if (tab == 0) state.mailAlerts else state.systemAlerts
+            val listed = if (tab == 0) state.mailAlerts.size else state.systemCount
             when {
                 state.isLoading ->
                     Box(
                         Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) { CircularProgressIndicator() }
-                list.isEmpty() ->
+                listed == 0 ->
                     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.TopCenter) {
                         Text(
                             stringResource(if (tab == 0) R.string.alerts_empty_mail else R.string.alerts_empty_system),
@@ -186,13 +194,23 @@ fun AlertsScreen(
                     }
                 else ->
                     LazyColumn(Modifier.fillMaxSize().testTag(AlertsTags.LIST)) {
-                        items(list, key = { it.id }) { alert ->
+                        items(if (tab == 0) state.mailAlerts else state.systemAlerts, key = { it.id }) { alert ->
                             AlertRow(
                                 alert,
                                 onClick = { callbacks.onOpen(alert) },
                                 onDismiss = { callbacks.onDismiss(alert) },
                             )
                             HorizontalDivider()
+                        }
+                        if (tab == 1) {
+                            items(state.notifications, key = { "notification:${it.accountId}:${it.id}" }) { n ->
+                                NotificationRow(
+                                    n,
+                                    accountLabel = state.accountLabel(n.accountId),
+                                    onAcknowledge = { callbacks.onAcknowledge(n) },
+                                )
+                                HorizontalDivider()
+                            }
                         }
                     }
             }
@@ -251,3 +269,87 @@ private fun AlertRow(
         }
     }
 }
+
+/** A write PostIMAP gave up on: what was attempted, on which message, why, and whether the app still shows it as done. */
+@Composable
+private fun NotificationRow(
+    notification: NotificationResponse,
+    accountLabel: String?,
+    onAcknowledge: () -> Unit,
+) {
+    val date =
+        remember(notification.createdAt) {
+            SearchRowFormat.dateLabel(
+                notification.createdAt,
+                Instant.now(),
+                ZoneId.systemDefault(),
+                Locale.getDefault(),
+            )
+        }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, top = 8.dp, bottom = 8.dp)
+            .testTag(AlertsTags.notification(notification.id)),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row {
+                Text(
+                    stringResource(R.string.alerts_notification_failed, actionLabel(notification.action)),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    date,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            notification.subject?.let {
+                Text(
+                    stringResource(R.string.alerts_notification_subject, it),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            notification.error?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+            if (notification.stillShownAsApplied) {
+                Text(
+                    stringResource(R.string.alerts_notification_still_applied),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            accountLabel?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        IconButton(onClick = onAcknowledge, modifier = Modifier.testTag(AlertsTags.acknowledge(notification.id))) {
+            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.alerts_dismiss))
+        }
+    }
+}
+
+/** The action the server names, in words; one this app has no label for shows as the server wrote it. */
+@Composable
+private fun actionLabel(action: String): String =
+    when (action) {
+        "flag_add" -> stringResource(R.string.alerts_action_flag_add)
+        "flag_remove" -> stringResource(R.string.alerts_action_flag_remove)
+        "move" -> stringResource(R.string.alerts_action_move)
+        "delete" -> stringResource(R.string.alerts_action_delete)
+        "send" -> stringResource(R.string.alerts_action_send)
+        "draft" -> stringResource(R.string.alerts_action_draft)
+        else -> action
+    }

@@ -77,6 +77,7 @@ class ContractTest {
             "NativePushConfigResponse" to NativePushConfigResponse.serializer(),
             "NativeSubscriptionCreate" to NativeSubscriptionCreate.serializer(),
             "AlertLookupRequest" to AlertLookupRequest.serializer(),
+            "NotificationResponse" to NotificationResponse.serializer(),
             "SignInResponse" to SignInResponse.serializer(),
         )
 
