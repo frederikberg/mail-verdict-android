@@ -5,16 +5,14 @@ import com.frederikberg.mailverdict.contract.OutboxCreateRequest
 import com.frederikberg.mailverdict.contract.OutboxResponse
 import com.frederikberg.mailverdict.contract.PendingSendResponse
 import com.frederikberg.mailverdict.kit.net.ApiClient
+import com.frederikberg.mailverdict.kit.net.FormFile
+import com.frederikberg.mailverdict.kit.net.MultipartForm
 import com.frederikberg.mailverdict.kit.net.RawBody
+import com.frederikberg.mailverdict.kit.net.sendForm
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
-import okio.Buffer
 
 /**
  * What `POST /outbox` answers: a plain send or draft becomes an [OutboxResponse] at once, a send held
@@ -63,43 +61,12 @@ suspend fun ApiClient.createOutbox(
     if (attachments.isEmpty()) {
         return send(OutboxCreateResultSerializer, "/outbox", method = "POST", body = json)
     }
-    val form = OutboxForm.build(json, attachments)
-    return send(
-        OutboxCreateResultSerializer,
-        "/outbox",
-        method = "POST",
-        body = form.bytes,
-        contentType = form.contentType,
-    )
-}
-
-/** The multipart body of [createOutbox], built whole so a retried request is the same bytes. */
-internal object OutboxForm {
-    class Built(
-        val bytes: ByteArray,
-        val contentType: String,
-    )
-
-    private val octetStream = "application/octet-stream".toMediaType()
-
-    fun build(
-        json: ByteArray,
-        attachments: List<OutboxUpload>,
-    ): Built {
-        val body =
-            MultipartBody
-                .Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("data", json.decodeToString())
-                .apply {
-                    attachments.forEach {
-                        val type = it.contentType?.toMediaTypeOrNull() ?: octetStream
-                        addFormDataPart("attachments", it.filename, it.data.toRequestBody(type))
-                    }
-                }.build()
-        val buffer = Buffer().also(body::writeTo)
-        return Built(buffer.readByteArray(), body.contentType().toString())
-    }
+    val form =
+        MultipartForm.build(
+            listOf("data" to json.decodeToString()),
+            attachments.map { FormFile("attachments", it.filename, it.contentType, it.data) },
+        )
+    return sendForm(OutboxCreateResultSerializer, "/outbox", form)
 }
 
 suspend fun ApiClient.listOutbox(

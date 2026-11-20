@@ -22,6 +22,8 @@ data class OutboxCreateRequest(
     val references: List<String>? = null,
     @SerialName("identity_id") val identityId: String? = null,
     @SerialName("replaces_message_id") val replacesMessageId: String? = null,
+    /** Aligned with the uploaded files: the content id of an inline image its `body_html` names as `cid:`, null for an ordinary attachment. */
+    @SerialName("inline_attachment_content_ids") val inlineAttachmentContentIds: List<String?>? = null,
     @SerialName("idempotency_key") val idempotencyKey: String? = null,
 )
 
