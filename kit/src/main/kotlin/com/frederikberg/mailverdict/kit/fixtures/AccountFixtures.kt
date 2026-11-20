@@ -2,8 +2,8 @@ package com.frederikberg.mailverdict.kit.fixtures
 
 /** Canned answers for the account, rules, settings and sign-in screens: invented people, servers and rules. */
 object AccountFixtures {
-    private const val RECEIPTS = "00000000-0000-4000-8000-0000000001f6"
-    private const val NEWSLETTER = "00000000-0000-4000-8000-0000000002f3"
+    private const val RECEIPTS = MailFixtures.INBOX
+    private const val NEWSLETTER = MailFixtures.SENT
 
     private fun signIn(
         id: String,
@@ -71,10 +71,6 @@ object AccountFixtures {
                 "[${signIn("s1", "phone", "Pixel 8", current = true)},${signIn("s2", "phone", "Tablet")}," +
                 "${signIn("s3", "browser", null)},${signIn("s4", "machine", "Backup script")}," +
                 "${signIn("s5", "phone", "Old phone", revokedAt = "2026-11-01T10:00:00+00:00")}]",
-            "GET /api/accounts/${Fixtures.PRIVATE_ACCOUNT}/folders" to
-                """[{"id":"$RECEIPTS","account_id":"${Fixtures.PRIVATE_ACCOUNT}","imap_name":"Receipts"}]""",
-            "GET /api/accounts/${Fixtures.WORK_ACCOUNT}/folders" to
-                """[{"id":"$NEWSLETTER","account_id":"${Fixtures.WORK_ACCOUNT}","imap_name":"Projects"}]""",
             "GET /api/pipeline" to pipeline,
             "GET /api/pipeline/health" to
                 """[{"stage_id":"newsletters","account_id":"${Fixtures.PRIVATE_ACCOUNT}","reference":"Newsletter","ok":false,"detail":"no such folder"}]""",
